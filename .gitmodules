@@ -1,0 +1,4 @@
+[submodule "brython"]
+    path = brython
+    url = https://github.com/jonathanverner/brython
+	branch = jinja2

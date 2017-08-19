@@ -1,0 +1,26 @@
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+#console {
+    height: 373px;
+    width: 717px;
+}
+</style>
+
+<link rel="pythonpath" href="lib" hreflang="py" />
+<script type="text/python" id="script2">
+    import brython_jinja2
+    from browser import document as doc
+    from console import Console
+    cons = Console(doc["console"])
+</script>
+</head>
+
+<body onload="brython(1)">
+<textarea id='console'>
+</textarea>
+<script src="brython.js"></script>
+<script src="brython_stdlib.js"></script>
+</body>
+</html>

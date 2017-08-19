@@ -1,0 +1,6 @@
+*.kdev*
+__pycache__*
+*pyc
+venv
+
+
