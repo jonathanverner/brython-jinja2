@@ -42,6 +42,11 @@ class Parser:
             elif token in [lexer.T_OTHER, lexer.T_NEWLINE, lexer.T_SPACE]:
                 content = val+tokenstream.cat_while([lexer.T_OTHER, lexer.T_NEWLINE, lexer.T_SPACE])
                 node = nodes.Text(content, location=pos, env=self.env)
+            elif token == lexer.T_EOS:
+                if start_node is not None:
+                    raise lexer.EOSException("End of stream reached while parsing "+str(start_node), src=self.src, location=tokenstream.loc)
+                else:
+                    return parsed_nodes
             else:
                 raise exceptions.TemplateSyntaxError("Unexpected token: "+str(token)+" ("+val+")", src=self.src, location=pos)
             if start_node is not None and node.ends(start_node):

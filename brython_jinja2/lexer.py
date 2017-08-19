@@ -14,6 +14,7 @@ T_HTML_COMMENT_END = 9
 T_NEWLINE = 10
 T_SPACE = 12
 T_OTHER = 13
+T_EOS = 14
 
 html_tokens = (
     (T_HTML_COMMENT_START, '<!--'),
@@ -63,7 +64,9 @@ class TokenStream:
     def __next__(self):
         if len(self.left) > 0:
             return self.left.pop(0)
-        if self.loc.pos >= len(self.src):
+        if self.loc.pos == len(self.src):
+            return (T_EOS, '', self.loc)
+        elif self.loc.pos > len(self.src):
             raise StopIteration
         for (token, string) in self.token_map:
             if self.src[self.loc.pos:self.loc.pos+len(string)] == string:
