@@ -1389,36 +1389,52 @@ class OpNode(ExpNode):
                 exp = v
         exp.solve(inverse(*args, **kwargs), x)
         
+    def _to_number(self, x, val):
+        if type(val) in [int, float]:
+            return val
+        try:
+            return int(val)
+        except:
+            pass
+        try:
+            return float(val)
+        except:
+            raise NoSolution(self, val, x)
+        
     def solve(self, val, x):
         if self._opstr == '-unary':
             if not self._rarg.equiv(x):
-            self._rarg.solve(-val, x)
                 raise NoSolution(self, val, x)
+            val = self._to_number(x, val)
+            return self._rarg.solve(-val, x)
         elif self._opstr == 'not':
             if not self._rarg.equiv(x):
-            self._rarg.solve(not val, x)
-        elif self._opstr == '[]':
-            self._larg.value[self._rarg.value] = value
                 raise NoSolution(self, val, x)
+            return self._rarg.solve(not val, x)
+        elif self._opstr == '[]' and self.equiv(x):
+            return self._assign(val)
         elif self._opstr == '()':
-            self._solve_func(val, x)
+            return self._solve_func(val, x)
         elif self._opstr == '*':
-            if not self._larg._contains(x):
-                self._rarg.solve(val/self._larg.eval(), x)
-            elif not self._rarg._contains(x):
-                self._larg.solve(val/self._larg.eval(), x)
+            val = self._to_number(x, val)
+            if not self._larg.contains(x):
+                return self._rarg.solve(val/self._larg.value, x)
+            elif not self._rarg.contains(x):
+                return self._larg.solve(val/self._larg.value, x)
             raise NoSolution(self, val, x)
         elif self._opstr == '-':
-            if not self._larg._contains(x):
-                self._rarg.solve(val+self._larg.eval(), x)
-            elif not self._rarg._contains(x):
-                self._larg.solve(val+self._larg.eval(), x)
+            val = self._to_number(x, val)
+            if not self._larg.contains(x):
+                return self._rarg.solve(val+self._larg.value, x)
+            elif not self._rarg.contains(x):
+                return self._larg.solve(val+self._larg.value, x)
             raise NoSolution(self, val, x)
         elif self._opstr == '+':
-            if not self._larg._contains(x):
-                self._rarg.solve(val-self._larg.eval(), x)
-            elif not self._rarg._contains(x):
-                self._larg.solve(val-self._larg.eval(), x)
+            val = self._to_number(x, val)
+            if not self._larg.contains(x):
+                return self._rarg.solve(val-self._larg.value, x)
+            elif not self._rarg.contains(x):
+                return self._larg.solve(val-self._rarg.value, x)
             raise NoSolution(self, val, x)
         else:
             raise NoSolution(self, val, x)
