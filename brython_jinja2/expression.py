@@ -15,7 +15,7 @@
 
 from .utils.events import EventMixin
 from .utils.observer import observe
-from .utils.functools import invertible, invert
+from .utils.functools import invertible, invert, self_generator
 
 ET_EXPRESSION = 0
 ET_INTERPOLATED_STRING = 1
@@ -206,7 +206,9 @@ def parse_identifier(expr, pos):
     return ret, pos
 
 
-def tokenize(expr):
+
+@self_generator
+def tokenize(self, expr):
     """
         A generator which takes a string and converts it to a
         stream of tokens, yielding the triples (token, its value, next position in the string)
@@ -214,8 +216,10 @@ def tokenize(expr):
     """
     # pylint: disable=too-many-branches; python doesn't have a switch statement
     # pylint: disable=too-many-statements; the length is just due to the many token types
+    self._src = expr
     pos = 0
     while pos < len(expr):
+        self._src_pos = pos
         tokentype = token_type(expr[pos:pos + 4])
         if tokentype == T_SPACE:
             pos = pos + 1
