@@ -62,9 +62,9 @@ class AttribStateMachine:
         self._mem['delimiter'] = None
         
     def read_name(self):
-        if self._mem['name'].startswith(self.env.variable_start_string):
-            if self.check_string(self.env.variable_end_string):
-                self._mem['name'] += self.env.variable_end_string
+        if self._mem['name'].startswith(self._env.variable_start_string):
+            if self.check_string(self._env.variable_end_string):
+                self._mem['name'] += self._env.variable_end_string
                 self.store_attr()
                 self.skip_chars(WHITESPACE)
                 return self.read_name
@@ -82,8 +82,8 @@ class AttribStateMachine:
                 self._mem['name'] += self.current_char
                 self.move_right()
                 return self.read_name
-            elif self._mem['name'] == '' and self.check_string(self.env.variable_start_string):
-                self._mem['name'] = self.env.variable_start_string
+            elif self._mem['name'] == '' and self.check_string(self._env.variable_start_string):
+                self._mem['name'] = self._env.variable_start_string
                 return self.read_name
             else:
                 raise InvalidSyntax("Unexpected char '"+self.current_char+"', expecting valid name char.",src=self._input, pos=self._head)
@@ -139,7 +139,7 @@ class AttribStateMachine:
     def parse(self, string):
         self.clear()
         self._input = string
-        self.skip_chars()
+        self.skip_chars(WHITESPACE)
         while not self.finished():
             self.step()
         if self._state in [self.read_name, self.test_eq]:
