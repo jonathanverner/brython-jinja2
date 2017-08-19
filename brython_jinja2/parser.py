@@ -31,7 +31,7 @@ class Parser:
                 tokenstream.skip([lexer.T_SPACE])
                 node_name = tokenstream.cat_until([lexer.T_SPACE, lexer.T_BLOCK_END])
                 args = tokenstream.cat_until([lexer.T_BLOCK_END])
-                node = self.factory.from_name(node_name, location=pos)
+                node = self.factory.from_name(node_name, location=pos, src=self.src)
                 parsed_nodes.append(node)
                 if self.env.trim_blocks:
                     tokenstream.skip([lexer.T_SPACE, lexer.T_NEWLINE])
@@ -43,13 +43,13 @@ class Parser:
                 content = val+tokenstream.cat_while([lexer.T_OTHER, lexer.T_NEWLINE, lexer.T_SPACE])
                 node = nodes.Text(content, location=pos, env=self.env)
             else:
-                raise exceptions.TemplateSyntaxError("Unexpected token"+str(token)+" ("+val+")", location=pos)
+                raise exceptions.TemplateSyntaxError("Unexpected token: "+str(token)+" ("+val+")", src=self.src, location=pos)
             if start_node is not None and node.ends(start_node):
                 return parsed_nodes, node
             else:
                 parsed_nodes.append(node)
         if start_node is not None:
-            raise lexer.EOSException("End of stream reached while parsing "+str(start_node), location=tokenstream.loc)
+            raise lexer.EOSException("End of stream reached while parsing "+str(start_node), src=self.src, location=tokenstream.loc)
         return parsed_nodes
                 
                 

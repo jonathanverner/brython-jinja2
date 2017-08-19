@@ -1,4 +1,5 @@
 from . import exceptions
+from .utils import Location
 
 T_BLOCK_START = 0
 T_BLOCK_END = 1
@@ -23,38 +24,6 @@ html_tokens = (
 )
 
 
-class EOSException(exceptions.TemplateSyntaxError):
-    pass
-
-class Location:
-    def __init__(self, name=None, filename=None, ln=0, col=0, pos=0):
-        self._name = name
-        self._fname = filename
-        self._ln = ln
-        self._col = col
-        self._pos = pos
-        
-    @property
-    def pos(self):
-        return self._pos
-    
-    def _inc_pos(self, delta=1):
-        self._pos += delta
-        self._col += delta
-        
-    def _newline(self):
-        self._ln += 1
-        self._col = 0
-        
-    def clone(self):
-        return Location(name=self._name, filename=self._fname, ln=self._ln, col=self._col, pos=self._pos)
-        
-    def __str__(self):
-        return "{name}({fname}):{ln}, {col}".format(name=self._name, fname=self._fname, ln=self._ln, col=self._col)
-    
-    def __repr__(self):
-        return str(self)
-
 class TokenStream:
     def __init__(self, src, name=None, fname=None, tmap=[]):
         self.loc = Location(name=name, filename=fname, pos=0, ln=0, col=0)
@@ -77,8 +46,7 @@ class TokenStream:
                 return ret
             else:
                 ret += val
-        #raise Exception("End of stream while looking for TOKENS '"+str(tokens)+"' in '"+str(self.token_map)+"' at "+str(self.loc) +"('"+self.src+"') got "+str(toks))
-        raise EOSException("End of stream while looking for TOKENS "+str(tokens), location=self.loc)
+        raise exceptions.EOSException("End of stream while looking for TOKENS "+str(tokens), src=self.src, location=self.loc)
         
     def cat_while(self, tokens):
         ret = ''

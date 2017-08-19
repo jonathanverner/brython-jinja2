@@ -7,10 +7,6 @@ from . import interpolatedstr
 from .platform import bs4
 from .utils import delayedupdater
 
-class RenderException(exceptions.TemplateError):
-    pass
-
-
 class RenderFactory:
     AVAILABLE = {}
     
@@ -24,7 +20,7 @@ class RenderFactory:
 
     def from_node(self, node):
         if not type(node) in self.active:
-            raise RenderError("No renderer available for node "+str(node), location=node._location)
+            raise exceptions.RenderError("No renderer available for node "+str(node), location=node._location)
         return self.active[type(node)](tpl_node=node, factory=self)
     
 default_factory = RenderFactory(environment.default_env)

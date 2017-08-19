@@ -13,6 +13,7 @@
 # pylint: disable=protected-access; pylint doesn't allow descendants to use parent's protected variables.
 #                                   here they are used extensively by descendants of the ExpNode class.
 
+from .exceptions import ExpressionError, ExpressionSyntaxError, NoSolution, SkipSubtree
 from .utils.events import EventMixin
 from .utils.observer import observe
 from .utils.functools import invertible, invert, self_generator
@@ -64,12 +65,6 @@ OP_PRIORITY = {
     '()': 5,    # Function calling
     '.': 5      # Attribute access has highest priority (e.g. a.c**2 is not a.(c**2), and a.func(b) is not a.(func(b)))
 }
-
-class ExpressionError(Exception):
-    pass
-
-class DoesNotExistError(ExpressionError):
-    pass
 
 
 def token_type(start_chars):
@@ -187,7 +182,7 @@ def parse_string(expr, pos):
             backslash = False
         pos = pos + 1
     if pos >= len(expr):
-        raise Exception("String is missing end quote: " + end_quote)
+        raise ExpressionSyntaxError("String is missing end quote: " + end_quote, src=expr, location=pos)
     return ret, pos + 1
 
 
@@ -334,8 +329,8 @@ class ExpNode(EventMixin):
             Tries to assign a value to x so that the subexpression rooted at this node evaluates to val. 
         """
         if self._ctx is None:
-            raise ExpressionError("Cannot solve without a context")
-        raise DoesNotExistError("No solution")
+            raise ExpressionError("Cannot solve without a context", src=str(self))
+        raise NoSolution(self, val, x)
     
     @property
     def mutable(self):
@@ -343,7 +338,7 @@ class ExpNode(EventMixin):
             Returns true if the value of the expression (as evaluated in the context to which it is bound) is mutable.
         """
         if not self._ctx:
-            raise ExpressionError("Mutable_val makes sense only for bound expressions.")
+            raise ExpressionError("Mutable_val makes sense only for bound expressions.", src=str(self))
         return False
     
     def simplify(self, assume_const=[]):
@@ -426,7 +421,7 @@ class ExpNode(EventMixin):
             self.emit('change', {'value': self._cached_val})
 
     def _assign(self, _val):
-        raise Exception("Assigning to " + str(self) + " not supported")
+        raise ExpressionError("Assigning to " + str(self) + " not supported")
 
     def bind_ctx(self, ctx):
         """
@@ -565,7 +560,7 @@ class IdentNode(ExpNode):
         
     def solve(self, value, x):
         if self._const:
-            raise DoesNotExistError()
+            raise NoSolution(self, value, x)
         if self.equiv(x):
             x._assign(value)
             
@@ -617,7 +612,7 @@ class IdentNode(ExpNode):
 
     def _assign(self, value):
         if self._const:
-            raise Exception("Cannot assign to the constant" + self._cached_val)
+            raise ExpressionError("Cannot assign '"+value+"' to the constant" + self._cached_val)
         else:
             setattr(self._ctx, self._ident, value)
 
@@ -805,19 +800,19 @@ class ListNode(MultiChildNode):
         
     def solve(self, val, x):
         if not isinstance(val, list) or len(self._children) != len(val):
-            raise DoesNotExistError()
+            raise NoSolution(self, val, x)
         
         solve_val = None
         solve_exp = None
         for index, ch in enumerate(self._children):
             if ch.contains(x):
                 if solve_exp is not None:
-                    raise DoesNotExistError()
+                    raise NoSolution(self, val, x)
                 else:
                     solve_exp = ch
                     solve_val = val[index]
         if solve_exp is None:
-            raise DoesNotExistError
+            raise NoSolution(self, val, x)
         solve_exp.solve(solve_val, x)
 
     def __repr__(self):
@@ -1168,7 +1163,7 @@ class ListComprNode(ExpNode):
             
     def solve(self, value, x):
         if not isinstance(value, list):
-            raise DoesNotExistError()
+            raise NoSolution(self, value, x)
         pos = 0
         self._ctx._save(self._var.name())
         new_val = []
@@ -1353,7 +1348,7 @@ class OpNode(ExpNode):
             of the call.
         """
         if self._opstr != '()':
-            raise Exception("Calling " + repr(self) + " does not make sense.")
+            raise ExpressionError("Calling " + repr(self) + " does not make sense.")
         func = self._larg.eval()
         args, kwargs = self._rarg.eval()
         args_copy = args.copy()
@@ -1366,13 +1361,13 @@ class OpNode(ExpNode):
         func = self._larg.eval()
         inverse = invert(func)
         if not invertible(func):
-            raise DoesNotExistError()
+            raise NoSolution(self, val, x)
         found = 0
         for k, v in self._rarg._kwargs.items():
             if v.contains(x):
                 found += 1
                 if found > 1:
-                    raise DoesNotExistError()
+                    raise NoSolution(self, val, x)
         args, kwargs = self._rarg.eval()
         exp = None
         for k, v in self._rarg._kwargs.items():
@@ -1388,14 +1383,14 @@ class OpNode(ExpNode):
     def solve(self, val, x):
         if self._opstr == '-unary':
             if not self._rarg.equiv(x):
-                raise DoesNotExistError()
             self._rarg.solve(-val, x)
+                raise NoSolution(self, val, x)
         elif self._opstr == 'not':
             if not self._rarg.equiv(x):
-                raise DoesNotExistError()
             self._rarg.solve(not val, x)
         elif self._opstr == '[]':
             self._larg.value[self._rarg.value] = value
+                raise NoSolution(self, val, x)
         elif self._opstr == '()':
             self._solve_func(val, x)
         elif self._opstr == '*':
@@ -1403,25 +1398,25 @@ class OpNode(ExpNode):
                 self._rarg.solve(val/self._larg.eval(), x)
             elif not self._rarg._contains(x):
                 self._larg.solve(val/self._larg.eval(), x)
-            raise DoesNotExistError()
+            raise NoSolution(self, val, x)
         elif self._opstr == '-':
             if not self._larg._contains(x):
                 self._rarg.solve(val+self._larg.eval(), x)
             elif not self._rarg._contains(x):
                 self._larg.solve(val+self._larg.eval(), x)
-            raise DoesNotExistError()
+            raise NoSolution(self, val, x)
         elif self._opstr == '+':
             if not self._larg._contains(x):
                 self._rarg.solve(val-self._larg.eval(), x)
             elif not self._rarg._contains(x):
                 self._larg.solve(val-self._larg.eval(), x)
-            raise DoesNotExistError()
+            raise NoSolution(self, val, x)
         else:
-            raise DoesNotExistError()
+            raise NoSolution(self, val, x)
         
     def _assign(self, value):
         if self._opstr != '[]':
-            raise Exception("Assigning to "+repr(self)+" does not make sense.")
+            raise ExpressionError("Assigning to "+repr(self)+" does not make sense.")
         self._larg.value[self._rarg.value] = value
         self.defined = True
 
@@ -1471,8 +1466,7 @@ def simplify(exp):
         assume_const = [IdentNode(a) for a in exp._ctx.immutable_attrs]
         return exp.simplify(assume_const)
 
-
-def partial_eval(arg_stack, op_stack, pri=-1):
+def partial_eval(arg_stack, op_stack, pri=-1, src=None, location=None):
     """ Partially evaluates the stack, i.e. while the operators in @op_stack have strictly
         higher priority then @pri, they are converted to OpNodes/AttrAccessNodes with
         arguments taken from the @arg_stack. The result is always placed back on the @arg_stack"""
@@ -1489,7 +1483,7 @@ def partial_eval(arg_stack, op_stack, pri=-1):
             else:
                 arg_stack.append(OpNode(operator, arg_l, arg_r))
         except IndexError:
-            raise Exception("Not enough arguments for operator '" + operator + "'")
+            raise ExpressionSyntaxError("Not enough arguments for operator '" + operator + "'", src=src, location=location)
 
 
 def parse_args(token_stream):
@@ -1575,7 +1569,7 @@ def parse_interpolated_str(tpl_expr, start='{{', end='}}'):
         of the default '{{' and '}}'
     """
     if start != '{{' or end != '}}':
-        raise Exception("Nondefault variable start and end strings in interpolated strings are not supported yet.")
+        raise ExpressionError("Nondefault "+start+","+end+" variable start and end strings are not supported yet.", src=tpl_expr)
     last_pos = 0
     abs_pos = tpl_expr.find("{{", 0)
     token_stream = tokenize(tpl_expr[abs_pos + 2:])
@@ -1587,8 +1581,7 @@ def parse_interpolated_str(tpl_expr, start='{{', end='}}'):
         ast, _etok, rel_pos = _parse(token_stream, end_tokens=[T_RBRACE])
         abs_pos += rel_pos                                                   # Move to the second ending brace of the expression
         if not tpl_expr[abs_pos] == "}":
-            raise Exception("Invalid interpolated string, expecting '}' at " +
-                            str(abs_pos) + " got '" + str(tpl_expr[abs_pos]) + "' instead.")
+            raise ExpressionSyntaxError("Invalid interpolated string, expecting '}'", src=tpl_expr, pos=abs_pos)
         else:
             abs_pos += 1                                                     # Skip the ending '}'
         ret.append(OpNode("()", IdentNode("str"), FuncArgsNode([ast], {})))  # Wrap the expression in a str call and add it to the list
@@ -1646,7 +1639,7 @@ def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False):
     save_pos = 0
     for (token, val, pos) in token_stream:
         if token in end_tokens:  # The token is unconsumed and in the stoplist, so we evaluate what we can and stop parsing
-            partial_eval(arg_stack, op_stack)
+            partial_eval(arg_stack, op_stack, src=token_stream._src, location=token_stream._src_pos)
             if len(arg_stack) == 0:
                 return None, token, pos
             else:
@@ -1662,7 +1655,7 @@ def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False):
             if val == '-' and (prev_token == T_OPERATOR or prev_token is None or prev_token == T_LBRACKET_LIST or prev_token == T_LPAREN_EXPR):
                 val = '-unary'
             pri = OP_PRIORITY[val]
-            partial_eval(arg_stack, op_stack, pri)
+            partial_eval(arg_stack, op_stack, pri, src=token_stream._src, location=token_stream._src_pos)
             op_stack.append((token, val))
         elif token == T_LBRACKET:
             # '[' can either start a list constant/comprehension, e.g. [1,2,3] or list slice, e.g. ahoj[1:10];
@@ -1676,7 +1669,7 @@ def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False):
             else:
                 is_slice, index_s, index_e, step = parse_slice(token_stream)
                 pri = OP_PRIORITY['[]']
-                partial_eval(arg_stack, op_stack, pri)
+                partial_eval(arg_stack, op_stack, pri, src=token_stream._src, location=token_stream._src_pos)
                 arg_stack.append(ListSliceNode(is_slice, index_s, index_e, step))
                 op_stack.append((T_OPERATOR, '[]'))
                 prev_token = T_LBRACKET_INDEX
@@ -1694,29 +1687,29 @@ def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False):
                 prev_token = T_LPAREN_FUNCTION
                 args, kwargs = parse_args(token_stream)
                 pri = OP_PRIORITY['()']
-                partial_eval(arg_stack, op_stack, pri)
+                partial_eval(arg_stack, op_stack, pri, src=token_stream._src, location=token_stream._src_pos)
                 arg_stack.append(FuncArgsNode(args, kwargs))
                 op_stack.append((T_OPERATOR, '()'))
             prev_token_set = True
         elif token == T_RPAREN:
-            partial_eval(arg_stack, op_stack)
+            partial_eval(arg_stack, op_stack, src=token_stream._src, location=token_stream._src_pos)
             if op_stack[-1][0] != T_LPAREN_EXPR:
                 raise Exception("Expecting '(' at " + str(pos))
             op_stack.pop()
         else:
             if trailing_garbage_ok:
-                partial_eval(arg_stack, op_stack)
+                partial_eval(arg_stack, op_stack, src=token_stream._src, location=token_stream._src_pos)
                 if len(arg_stack) > 2 or len(op_stack) > 0:
-                    raise Exception("Invalid expression, leftovers: args:"+str(arg_stack)+"ops:"+str(op_stack))
+                    raise ExpressionSyntaxError("Invalid expression, leftovers: args:"+str(arg_stack)+"ops:"+str(op_stack), src=token_stream._src, location=token_stream._src_pos)
                 return arg_stack[0], None, pos
             else:
-                raise Exception("Unexpected token "+str((token, val))+" at "+str(pos))
+                raise ExpressionSyntaxError("Unexpected token "+str((token, val)), src=token_stream._src, location=token_stream._src_pos)
         if not prev_token_set:
             prev_token = token
         else:
             prev_token_set = False
         save_pos = pos
-    partial_eval(arg_stack, op_stack)
+    partial_eval(arg_stack, op_stack, src=token_stream._src, location=token_stream._src_pos)
     if len(arg_stack) > 2 or len(op_stack) > 0:
-        raise Exception("Invalid expression, leftovers: args:"+str(arg_stack)+"ops:"+str(op_stack))
+        raise ExpressionSyntaxError("Invalid expression, leftovers: args:"+str(arg_stack)+"ops:"+str(op_stack), src=token_stream._src, location=token_stream._src_pos)
     return arg_stack[0], None, save_pos

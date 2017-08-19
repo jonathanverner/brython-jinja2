@@ -104,9 +104,9 @@ class NodeFactory:
         self.env = env
         self.active = { k:v for k,v in self.AVAILABLE.items() if k not in env.disabled_tags}
         
-    def from_name(self, name, location):
+    def from_name(self, name, location, src=''):
         if name not in self.active:
-            raise exceptions.TemplateSyntaxError("Unknown (or disabled) tag: "+name, location=location)
+            raise exceptions.TemplateSyntaxError("Unknown (or disabled) tag: "+name, src=src, location=location)
         return self.active[name](name=name, location=location, env=self.env)
         
 def register_node(NodeName):
