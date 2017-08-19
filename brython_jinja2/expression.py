@@ -505,7 +505,7 @@ class ConstNode(ExpNode):
     def clone(self):
         # Const Nodes can't change, so clones can be identical
         return self
-
+    
     def __repr__(self):
         return repr(self._cached_val)
     
@@ -939,7 +939,7 @@ class ConstFuncArgsNode(ExpNode):
     
     def bind_ctx(self, ctx):
         self._ctx = ctx
-        
+
     def __repr__(self):
         return ','.join([repr(arg) for arg in self._args] +
                         [arg + '=' + repr(val) for (arg, val) in self._kwargs.items()])
@@ -1247,6 +1247,7 @@ class ListComprNode(ExpNode):
     def __eq__(self, other):
         return type(self) == type(other) and self._var == other._var and self._cond == other._cond and self._expr == other._expr and self._lst == other._lst
         
+
 class OpNode(ExpNode):
     """ Node representing an operation, e.g. a is None, a**5, a[10], a.b or func(x,y)"""
     UNARY = ['-unary', 'not']
@@ -1489,7 +1490,7 @@ def simplify(exp):
         return exp.simplify()
     else:
         assume_const = [IdentNode(a) for a in exp._ctx.immutable_attrs]
-        return exp.simplify(assume_const)
+        return exp.simplify(assume_const)     
 
 def partial_eval(arg_stack, op_stack, pri=-1, src=None, location=None):
     """ Partially evaluates the stack, i.e. while the operators in @op_stack have strictly

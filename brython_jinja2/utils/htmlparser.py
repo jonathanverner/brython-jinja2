@@ -133,6 +133,7 @@ class AttribStateMachine:
         
     def step(self):
         self._state = self._state()
+        #print(self._state, self.current_char, self._head)
         
     def finished(self):
         return self._head >= len(self._input)
