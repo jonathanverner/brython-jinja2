@@ -472,11 +472,11 @@ class ExpNode(EventMixin):
         """
         return self == other
     
-    def contains(self, identifier):
+    def contains(self, exp):
         """
-            Returns true if the subexpression rooted at the current node contains the identifier `identifier`
+            Returns true if the exp is a subexpression of the expression rooted at the current node.
         """
-        return False
+        return self.equiv(exp)
     
     def __eq__(self, other):
         return False
@@ -651,9 +651,6 @@ class IdentNode(ExpNode):
     def __repr__(self):
         return self.name()
     
-    def contains(self, identifier):
-        return self.equiv(identifier)
-    
     def __eq__(self, other):
         return type(self) == type(other) and self._ident == other._ident
 
@@ -761,10 +758,11 @@ class MultiChildNode(ExpNode):
             self._dirty = True
             self.emit('change')
             
-    def contains(self, ident):
+    def contains(self, exp):
         for ch in self._children:
-            if ch.contains(ident):
+            if ch.contains(exp):
                 return True
+        return self.equiv(exp)
             
     def __eq__(self, other):
         if not type(other) == type(self):
@@ -898,12 +896,13 @@ class FuncArgsNode(MultiChildNode):
             self._dirty = True
             self.emit('change')
 
-    def contains(self, ident):
-        if super().contains(ident):
+    def contains(self, exp):
+        if super().contains(exp):
             return True
         for (kwarg, val) in self._kwargs.items():
-            if val.contains(ident):
+            if val.contains(exp):
                 return True
+        return self.equiv(exp)
         
     def __repr__(self):
         return ','.join([repr(child) for child in self._children] +
@@ -1104,8 +1103,8 @@ class AttrAccessNode(ExpNode):
             self._dirty = True
             self.emit('change', {})
 
-    def contains(self, identifier):
-        return self._obj.contains(identifier)
+    def contains(self, exp):
+        return self._obj.contains(exp) or self.equiv(exp)
     
     def __repr__(self):
         return repr(self._obj) + '.' + repr(self._attr)
@@ -1220,12 +1219,12 @@ class ListComprNode(ExpNode):
         self._cond.bind_ctx(context)
         self._expr.bind_ctx(context)
 
-    def contains(self, identifier):
-        if self._lst.contains(identifier):
+    def contains(self, exp):
+        if self._lst.contains(exp):
             return True
-        if self.var_name.equiv(identifier):
+        if self.var_name.equiv(exp):
             return False
-        return self._expr.contains(identifier) or self._cond.contains(identifier)
+        return self._expr.contains(exp) or self._cond.contains(exp) or self.equiv(exp)
     
     def __repr__(self):
         if self._cond is None:
@@ -1426,10 +1425,10 @@ class OpNode(ExpNode):
             self._larg.bind_ctx(context)
         self._rarg.bind_ctx(context)
         
-    def contains(self, identifier):
-        if self._larg is not None and self._larg.contains(identifier):
+    def contains(self, exp):
+        if self._larg is not None and self._larg.contains(exp):
             return True
-        return self._rarg.contains(identifier)
+        return self._rarg.contains(exp) or self.equiv(exp)
 
     def __repr__(self):
         if self._opstr == '-unary':
