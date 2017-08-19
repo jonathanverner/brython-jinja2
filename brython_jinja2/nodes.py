@@ -72,6 +72,8 @@ class HTMLElement(Node):
         args = self._parse_args(args)
         if not closed:
             super().parse(args, token_stream, parser)
+        else:
+            self._args = args
             
     def __str__(self):
         return "<"+self._name+" "+" ".join([k+"="+str(v) for k,v in self._args.items()])+"> (at "+str(self._location)+")"

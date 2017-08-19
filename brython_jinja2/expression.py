@@ -562,7 +562,7 @@ class IdentNode(ExpNode):
         if self._const:
             raise NoSolution(self, value, x)
         if self.equiv(x):
-            x._assign(value)
+            self._assign(value)
             
         
     def simplify(self, assume_const=[]):
@@ -1074,6 +1074,14 @@ class AttrAccessNode(ExpNode):
 
         obj_val = self._obj.evalctx(context)
         return getattr(obj_val, self._attr.name())
+    
+    def solve(self, val, x):
+        if self.equiv(x):
+            try:
+                self._assign(val)
+            except:
+                pass
+        raise NoSolution(self, val, x)
 
     def _assign(self, value):
         obj_val = self._obj.eval()
@@ -1216,8 +1224,10 @@ class ListComprNode(ExpNode):
     def bind_ctx(self, context):
         super().bind_ctx(context)
         self._lst.bind_ctx(context)
-        self._cond.bind_ctx(context)
         self._expr.bind_ctx(context)
+        if self._cond is not None:
+            self._cond.bind_ctx(context)
+        
 
     def contains(self, exp):
         if self._lst.contains(exp):
@@ -1358,9 +1368,9 @@ class OpNode(ExpNode):
     
     def _solve_func(self, val, x):
         func = self._larg.eval()
-        inverse = invert(func)
         if not invertible(func):
             raise NoSolution(self, val, x)
+        inverse = invert(func)
         found = 0
         for k, v in self._rarg._kwargs.items():
             if v.contains(x):
@@ -1574,7 +1584,8 @@ def parse_interpolated_str(tpl_expr, start='{{', end='}}'):
     token_stream = tokenize(tpl_expr[abs_pos + 2:])
     ret = []
     while abs_pos > -1:
-        ret.append(ConstNode(tpl_expr[last_pos:abs_pos]))                    # Get string from last }} to current {{
+        if last_pos < abs_pos:
+            ret.append(ConstNode(tpl_expr[last_pos:abs_pos]))                # Get string from last }} to current {{
         abs_pos += 2                                                         # Skip '{{'
         token_stream = tokenize(tpl_expr[abs_pos:])                          # Tokenize string from {{ to the ending }}
         ast, _etok, rel_pos = _parse(token_stream, end_tokens=[T_RBRACE])

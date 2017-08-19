@@ -39,7 +39,7 @@ class Parser:
             elif token == lexer.T_COMMENT_START:
                 node = nodes.Comment(location=pos, env=self.env)
                 node.parse(args, tokenstream, self)
-            elif token == lexer.T_OTHER:
+            elif token in [lexer.T_OTHER, lexer.T_NEWLINE, lexer.T_SPACE]:
                 content = val+tokenstream.cat_while([lexer.T_OTHER, lexer.T_NEWLINE, lexer.T_SPACE])
                 node = nodes.Text(content, location=pos, env=self.env)
             else:

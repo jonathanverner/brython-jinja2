@@ -23,7 +23,7 @@ class AttribStateMachine:
         
     def clear(self):
         self._input = ''
-        self._head = -1
+        self._head = 0
         self._mem = {'ret':{}, 'name':'','val':None, 'delimiter':None}
         self._state = self.read_name
         
@@ -91,6 +91,7 @@ class AttribStateMachine:
     def read_val(self):
         if self.current_char in self._mem['delimiter']:
             self.store_attr()
+            self.move_right()
             self.skip_chars(WHITESPACE)
             return self.read_name
         elif self._mem['delimiter']==WHITESPACE and self.current_char not in NAME_CHARS:
