@@ -18,11 +18,36 @@ from brython_jinja2.platform import bs4
 from browser import document as doc
 ctx = Context()
 d = bs4.Tag('<div></div>')
-t = Template("""<div class='{{ " ".join(css_classes) }}' id='{{ id }}' style='border:solid,1px,black'>Ahoj {{ name }}</div>""")
+t = Template("""
+    <div class='{{ " ".join(css_classes) }}' id='{{ id }}' style='border:solid,1px,black'>
+        Ahoj {{ name }}<br/>
+        List: [{{ ",".join([str(a) for a in abc]) }}]<br/>
+        Index: {{ x }}<br/>
+    </div>
+    <div>
+    Name: <input type='text' value='{{ name }}' data-value-source='name' data-update-source-on='input' />
+    Number: <input type='text' value='{{ x+10 }}' data-value-source='x' data-update-source-on='input' />
+    List Element: <input type='text' value='{{ abc[x] }}' data-value-source='abc[x]' data-update-source-on='input' />
+    </div>
+""")
 ctx.css_classes=['red','green','blue']
 ctx.id='test'
 ctx.name='Jonathane'
+ctx.x=0
+ctx.abc=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']
 doc <= d._elt
+f = t.render(ctx, d)
+
+t._rendered_nodes[-2]._children[-2]._value_expr._src.strip('{{').strip('}}')
+
+from brython_jinja2.template import Template
+from brython_jinja2.context import Context
+from brython_jinja2.platform import bs4
+from browser import document as doc
+ctx = Context()
+d = bs4.Tag('<div></div>')
+doc <= d._elt
+t = Template("""<input type='text' value='{{ name }}' data-value-source='name' />""")
 f = t.render(ctx, d)
 
 

@@ -4,6 +4,7 @@ from . import exceptions
 from . import nodes
 from . import environment
 from . import interpolatedstr
+from . import expression
 from .platform import bs4
 from .utils import delayedupdater
 
@@ -62,6 +63,8 @@ class RenderNode(delayedupdater.DelayedUpdater):
 
 @register_render_node(nodes.HTMLElement)
 class HTMLElement(RenderNode):
+    UPDATE_ON = 'blur'
+    
     def __init__(self, tpl_node=None, factory=default_factory):
         super().__init__(tpl_node, factory)
         self._attrs = {}
@@ -71,6 +74,10 @@ class HTMLElement(RenderNode):
                 self._attrs[attr] = val.clone()
             else:
                 self._attrs[attr] = val
+        
+        self._value_expr = None
+        self._source_expr = None
+        self._update_on = self.UPDATE_ON
                 
     def clone(self, clone_into=None):
         clone_into = super().clone(clone_into)
@@ -81,6 +88,19 @@ class HTMLElement(RenderNode):
                 clone_into._attrs[attr] = val
         return clone_into
     
+    
+    def _setup_value_binding(self, val):
+        self._value_expr = val.get_ast(0, strip_str=True)
+        src = self._attrs.get('data-value-source', None)
+        if isinstance(src, interpolatedstr.InterpolatedStr):
+            raise exceptions.TemplateSyntaxError('Value source must be a bare expression, not an interpolated string: '+str(src), src=None, location=self._tpl_node._location)
+        if src is None:
+            raise NotImplementedError("Guessing value source not supported yet, please provide a data-value-source attribute at "+str(self._tpl_node._location))
+        self._source_expr, _ = expression.parse(src)
+        self._update_on = self._attrs.get('data-update-source-on', self.UPDATE_ON)
+        self._elt._elt.bind(self._update_on, self._update_source)
+        
+            
     @coroutine
     def render_into(self, ctx, parent):
         tn = self._tpl_node
@@ -90,6 +110,8 @@ class HTMLElement(RenderNode):
                 val.bind_ctx(ctx)
                 val.bind('change', self._change_handler)
                 self._elt[attr] = val.value
+                if attr.lower() == 'value':
+                    self._setup_value_binding(val)
             else:
                 self._elt[attr]=val
         for da in self._dynamic_attrs:
@@ -113,6 +135,23 @@ class HTMLElement(RenderNode):
             da.unbind('change')
         self._elt.decompose()
     
+    def _update_source(self, evt):
+        if self._elt['value'] == self._value_expr.value:
+            print("VALUE UNCHANGED", self._value_expr.value)
+            return
+        else:
+            try:
+                self._value_expr.solve(self._elt['value'], self._source_expr)
+            except Exception as ex:
+                print("Context:", self._value_expr._ctx)
+                print("Source equiv to Value:", self._value_expr.equiv(self._source_expr))
+                print("Value Expr:", self._value_expr)
+                print("Source Expr:", self._source_expr)
+                print("Orig value:", self._elt['value'])
+                print("Exception setting value:", str(ex))
+                print("Final value", self._value_expr.value)
+                self._elt['value'] = self._value_expr.value
+            
     def _update(self):
         for attr, val in self._attrs.items():
             if isinstance(val, interpolatedstr.InterpolatedStr):

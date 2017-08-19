@@ -119,6 +119,8 @@ class Tag:
         self._elt.remove()
 
     def __getitem__(self, key):
+        if key == 'value' and self.name.upper()=='INPUT':
+            return self._elt.value
         ret = self._elt.getAttribute(key)
         if ret is None:
             raise KeyError(key)
@@ -130,6 +132,9 @@ class Tag:
             return ret
 
     def __setitem__(self, key, value):
+        if key == 'value' and self.name.upper()=='INPUT':
+            return self._elt.set_value(value)
+        
         if isinstance(value, list):
             value = ' '.join(list)
         self._elt.setAttribute(key, value)

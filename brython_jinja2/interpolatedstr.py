@@ -61,6 +61,13 @@ class InterpolatedStr(EventMixin):
 
     def clone(self):
         return InterpolatedStr(self)
+    
+    def get_ast(self, n, strip_str=True):
+        if not strip_str:
+            return self.asts[n]
+        else:
+            return self.asts[n]._rarg._children[0]
+        
 
     def _change_chandler(self, event, ast_index):
         if not self._dirty_vals:
