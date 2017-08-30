@@ -6,8 +6,8 @@ from webbrowser import open_new_tab
 
 from .utils import M
 
-runner = local['pytest']['--cov=./brython_jinja2']
-
+test_runner = local['pytest']['--cov=./brython_jinja2']
+linter = local['pylint']
 @M.command()
 def devserver(port=8080):
     os.chdir(os.path.dirname(os.path.dirname(__file__))+'/web')
@@ -21,7 +21,14 @@ def run(tests=None):
     else:
         tests = 'tests/brython_jinja2/test_'+tests+'.py'
     try:
-        runner.run(tests, stdout=sys.stdout, stderr=sys.stderr)
+        est_runner.run(tests, stdout=sys.stdout, stderr=sys.stderr)
     except:
         pass
 
+@M.command()
+def lint(report=False):
+    with local.env(PYTHONPATH='./:./tests/brython/'):
+        if not report:
+            linter("--reports=n", "brython_jinja2")
+        else:
+            linter("brython_jinja2")
