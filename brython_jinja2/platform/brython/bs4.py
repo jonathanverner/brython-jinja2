@@ -1,5 +1,4 @@
 from browser import document, window
-#from javascript import JSObject
 
 
 def dom_from_html(html):
@@ -159,7 +158,7 @@ class Document:
             kwargs.update(attrs)
         if class_ is not None:
             kwargs['class'] = class_
-        if len(kwargs) > 0:
+        if kwargs:
             for (attr, val) in kwargs.items():
                 attr_selector += '['+attr+'='+str(val)+']'
         if isinstance(filter, list):
@@ -181,7 +180,7 @@ class Document:
         if attrs is not None:
             kwargs.update(attrs)
         attr_selector = ''
-        if len(kwargs) > 0:
+        if kwargs:
             for (attr, val) in kwargs.items():
                 attr_selector += '['+attr+'='+str(val)+']'
         if isinstance(filter, list):
@@ -204,7 +203,7 @@ class Document:
 
     @property
     def children(self):
-        return iter(self.contents())
+        return iter(self.contents)
 
     @property
     def descendants(self):
@@ -218,7 +217,7 @@ class Document:
         return self[selector]
 
     def __getitem__(self, selector):
-        return [Tag(l) for l in window.document.querySelectorAll(key)]
+        return [Tag(l) for l in window.document.querySelectorAll(selector)]
 
     def __getattr__(self, name):
         return self.find(name)

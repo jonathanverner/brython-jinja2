@@ -9,10 +9,9 @@ def dom_from_html(html):
     soup = BeautifulSoup(html, "html.parser")
     return soup.contents[0]
 
-def le(self, other):
+def __le__(self, other):
     self.append(other)
-Tag.__le__ = le
-
+Tag.__le__ = __le__
 
 
 
@@ -26,7 +25,9 @@ class doc(BeautifulSoup):
 
     def __le__(self, other):
         self.append(other)
-
-
-
-
+        
+    def insert_after(self, elt):
+        raise NotImplementedError()
+    
+    def insert_before(self, elt):
+        raise NotImplementedError()
