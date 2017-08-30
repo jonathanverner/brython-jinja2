@@ -612,7 +612,7 @@ class IdentNode(ExpNode):
 
     def _assign(self, value):
         if self._const:
-            raise ExpressionError("Cannot assign '"+value+"' to the constant" + self._cached_val)
+            raise ExpressionError("Cannot assign '"+str(value)+"' to the constant" + str(self._cached_val))
         else:
             setattr(self._ctx, self._ident, value)
 
