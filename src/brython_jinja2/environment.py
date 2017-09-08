@@ -59,8 +59,11 @@ class Environment:
         return ret
         
     def _tokenize(self, source, name, filename=None):
-        """Called by the parser to do the preprocessing and filtering
-        for all the extensions.  Returns an iterator.
+        """
+        Called by the parser to do the preprocessing and filtering for all the extensions.  
+        
+        Returns:
+            iterable((token, val, pos)): returns an iterable of tokens
         """
         source = self.preprocess(source, name, filename)
         stream = lexer.TokenStream(source, name=name, fname=filename, tmap=self.token_map)

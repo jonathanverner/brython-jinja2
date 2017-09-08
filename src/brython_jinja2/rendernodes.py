@@ -37,7 +37,7 @@ class RenderNode(delayedupdater.DelayedUpdater):
         super().__init__()
         self._tpl_node = tpl_node
         self._factory = factory
-        self._children = [self._factory.from_node(ch) for ch in tpl_node.children()]
+        self._children = [self._factory.from_node(ch) for ch in tpl_node.children]
         self._parent = None
         for ch in self._children:
             ch.bind('change', self._child_change_handler)

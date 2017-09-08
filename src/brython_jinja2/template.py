@@ -16,14 +16,19 @@ class Template(events.EventMixin):
         self._rendered_nodes = []
         self._update_scheduled = False
         self._update_interval = update_interval
+        self._errors = []
         
     @coroutine
     def render(self, ctx, into):
         for node in self.ast:
-            rn = self.render_factory.from_node(node)
-            yield rn.render_into(ctx, into)
-            self._rendered_nodes.append(rn)
-            rn.bind('change', self._schedule_update)
+            try:
+                rn = self.render_factory.from_node(node)
+                yield rn.render_into(ctx, into)
+                self._rendered_nodes.append(rn)
+                rn.bind('change', self._schedule_update)
+            except Exception as ex:
+                self._errors.append((node, ex))
+                print("Error rendering "+str(node)+":"+str(ex))
     
     @coroutine
     def _schedule_update(self, evt):

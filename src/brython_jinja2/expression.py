@@ -17,6 +17,7 @@ from .exceptions import ExpressionError, ExpressionSyntaxError, NoSolution, Skip
 from .utils.events import EventMixin
 from .utils.observer import observe
 from .utils.functools import invertible, invert, self_generator
+from .utils import parser_utils as utils
 
 ET_EXPRESSION = 0
 ET_INTERPOLATED_STRING = 1
@@ -201,7 +202,6 @@ def parse_identifier(expr, pos):
     return ret, pos
 
 
-
 @self_generator
 def tokenize(self, expr):
     """
@@ -316,6 +316,27 @@ class ExpNode(EventMixin):
         # should be set to True and only reset to False on a
         # subsequent call to evaluate.
         self._dirty = True
+        
+    def _visit(self, visitor, results):
+        """
+            Calls the function visitor with the `results` list as the first argument and 
+            the current node as the second argument. The return value, if not None, is paired
+            with the current node and appended to the `results` list. Then it iteratively
+            does the same for each of its children.
+            
+            If the visitor raises StopIteration, the whole process is stopped. If the visitor
+            raises the SkipSubTree exception, the children of this node are not visited.
+            
+            The base implementation in ExpNode returns True, if children should be visited
+            and False otherwise (e.g. if the visitor raised the `SkipSubTree` exception)
+        """
+        try:
+            ret = visitor(results, self)
+        except SkipSubtree:
+            return False
+        if ret is not None:
+            results.append((self, ret))
+        return True
         
     def is_const(self, assume_const=[]):
         """
@@ -670,6 +691,14 @@ class MultiChildNode(ExpNode):
             if child is not None:
                 child.bind('change', lambda event, chi=ch_index: self._child_changed(event, chi))
 
+    def _visit(self, visitor, results):
+        if super()._visit(visitor, results):
+            for ch in self._children:
+                ch._visit(visitor, results)
+            return True
+        else:
+            return False
+
     def is_const(self, assume_const=[]):
         for ch in self._children:
             if ch is not None and not ch.is_const(assume_const):
@@ -828,6 +857,11 @@ class FuncArgsNode(MultiChildNode):
         for (kwarg, val) in self._kwargs.items():
             val.bind('change', lambda event, arg=kwarg: self._kwarg_change(event, arg))
 
+    def _visit(self, visitor, results):
+        if super()._visit(visitor, results):
+            for ch in self._kwargs:
+                ch._visit(visitor, results)
+    
     def clone(self):
         cloned_args = super().clone()
         cloned_kwargs = {}
@@ -1029,6 +1063,10 @@ class AttrAccessNode(ExpNode):
         self._observer = None
         self._obj.bind('change', self._change_handler)
 
+    def _visit(self, visitor, results):
+        if super()._visit(visitor, results):
+            self._obj._visit(visitor, results)
+        
     def clone(self):
         return AttrAccessNode(self._obj.clone(), self._attr.clone())
     
@@ -1137,6 +1175,12 @@ class ListComprNode(ExpNode):
         if self._cond is not None:
             self._cond.bind('change', self._change_handler)
 
+    def _visit(self, visitor, results):
+        if super()._visit(visitor, results):
+            self._expr._visit(visitor, results)
+            self._lst._visit(visitor, results)
+            self._cond._visit(visitor, results)
+            
     def is_const(self, assume_const=[]):
         return self._lst.is_const(assume_const) and self._expr.is_const(assume_const=assume_const+[self._var])
     
@@ -1287,6 +1331,11 @@ class OpNode(ExpNode):
             l_exp.bind('change', self._change_handler)
         r_exp.bind('change', self._change_handler)
 
+    def _visit(self, visitor, results):
+        if super()._visit(visitor, results):
+            if self._larg is not None:
+                self._larg._visit(visitor, results)
+            self._rarg._visit(visitor, results)
     @property
     def mutable(self):
         if self._opstr == '[]':
@@ -1576,7 +1625,11 @@ def parse_slice(token_stream):
     return is_slice, index_s, index_e, step
 
 
-def parse_interpolated_str(tpl_expr, start='{{', end='}}'):
+def my_find(haystack, needle, stop_strs):
+    pass
+    
+
+def parse_interpolated_str(tpl_expr, start='{{', end='}}', stop_strs=[]):
     """ Parses a string of the form
 
         ```
@@ -1590,33 +1643,44 @@ def parse_interpolated_str(tpl_expr, start='{{', end='}}'):
           ["Test text ",str(exp)," other text ",str(exp2)," final text."]
         ```
         
-        When `start` or `stop` are given non-default values, expressions are
-        enclosed between the string `start` and the string `stop` instead
-        of the default '{{' and '}}'
+        Args:
+            start (str): the string opening an expression (defaults to '{{')
+            end (str):   the string closing an expression (defaults to '}}')
+            stop_strs list[str]: Optionally stop parsing when reaching stop_str 
+                outside of an expression
+        
+        Returns:
+            str, list[ExpNode]: The parsed part of the string, a list of asts representing the text (ConstNodes)
+                 and asts of the expressions
+                           
+        Raises:
+            ExpressionSyntaxError: In case either one of the expressions is not
+                a valid expression or if one of the expressions is not closed
     """
-    if start != '{{' or end != '}}':
-        raise ExpressionError("Nondefault "+start+","+end+" variable start and end strings are not supported yet.", src=tpl_expr)
     last_pos = 0
-    abs_pos = tpl_expr.find("{{", 0)
-    token_stream = tokenize(tpl_expr[abs_pos + 2:])
+    matcher = utils.MultiMatcher([start]+stop_strs)
+    abs_pos, match = matcher.find(tpl_expr)
+    if abs_pos > -1:
+        token_stream = tokenize(tpl_expr[abs_pos + len(match):])
     ret = []
-    while abs_pos > -1:
+    while abs_pos > -1 and match not in stop_strs:
         if last_pos < abs_pos:
-            ret.append(ConstNode(tpl_expr[last_pos:abs_pos]))                # Get string from last }} to current {{
-        abs_pos += 2                                                         # Skip '{{'
-        token_stream = tokenize(tpl_expr[abs_pos:])                          # Tokenize string from {{ to the ending }}
-        ast, _etok, rel_pos = _parse(token_stream, end_tokens=[T_RBRACE])
-        abs_pos += rel_pos                                                   # Move to the second ending brace of the expression
-        if not tpl_expr[abs_pos] == "}":
-            raise ExpressionSyntaxError("Invalid interpolated string, expecting '}'", src=tpl_expr, pos=abs_pos)
+            ret.append(ConstNode(tpl_expr[last_pos:abs_pos]))                # Get string from the end of the previous expression to the start of the next expression
+        abs_pos += len(start)                                                # Skip the opening string (start)
+        token_stream = tokenize(tpl_expr[abs_pos:])                          # Tokenize the expression
+        ast, _etok, rel_pos = _parse(token_stream, end_tokens=[str(end[0])])
+        abs_pos += rel_pos                                                   # Skip the first character of the closing string (end)
+        if not tpl_expr[abs_pos:abs_pos+len(end)-1] == end[1:]:
+            raise ExpressionSyntaxError("Invalid interpolated string, expecting '"+str(end[1:])+"'", src=tpl_expr, pos=abs_pos)
         else:
-            abs_pos += 1                                                     # Skip the ending '}'
+            abs_pos += len(end)-1                                            # Skip the rest of the closing string (end)
         ret.append(OpNode("()", IdentNode("str"), FuncArgsNode([ast], {})))  # Wrap the expression in a str call and add it to the list
         last_pos = abs_pos
-        abs_pos = tpl_expr.find("{{", last_pos)
-    if len(tpl_expr) > last_pos:
-        ret.append(ConstNode(tpl_expr[last_pos:]))
-    return ret
+        abs_pos, match = matcher.find(tpl_expr, last_pos)
+    if len(tpl_expr) > last_pos and not match in stop_strs:
+        abs_pos = len(tpl_expr)
+    ret.append(ConstNode(tpl_expr[last_pos:abs_pos]))
+    return tpl_expr[:abs_pos], ret
 
 
 _PARSE_CACHE = {}
@@ -1648,13 +1712,21 @@ def parse(expr, trailing_garbage_ok=False, use_cache=True):
     return ast, pos
 
 
-def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False):
+def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False, end_token_vals=[]):
     """
-        Parses the token_stream, optionally stopping when an
-        unconsumed token from end_tokens is found. Returns
-        the parsed tree (or None if the token_stream is empty),
-        the last token seen and the position corresponding to
-        the next position in the source string.
+        Parses the `token_stream`, optionally stopping when an
+        unconsumed token which is either a token in `end_tokens` or its string value is 
+        in `end_tokens`.
+        
+        Args:
+            token_stream (iterator): The token stream
+            end_tokens (list): A list of stop token classes and stop token values
+        
+        Returns:
+            triple: the parsed tree, last token seen, next position
+            
+            The parsed tree may be None if the `token_stream` is empty.
+            `next_position` corresponds to the next position in the source string.
 
         The parser is a simple stack based parser, using a variant
         of the [Shunting Yard Algorithm](https://en.wikipedia.org/wiki/Shunting-yard_algorithm)
@@ -1665,7 +1737,7 @@ def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False):
     prev_token_set = False
     save_pos = 0
     for (token, val, pos) in token_stream:
-        if token in end_tokens:  # The token is unconsumed and in the stoplist, so we evaluate what we can and stop parsing
+        if token in end_tokens or (type(val) == str and val in end_tokens):  # The token is unconsumed and in the stoplist, so we evaluate what we can and stop parsing
             partial_eval(arg_stack, op_stack, src=token_stream._src, location=token_stream._src_pos)
             if len(arg_stack) == 0:
                 return None, token, pos

@@ -69,11 +69,19 @@ print(c.d)
 print(c)
 print(c.immutable_attrs)
 
+from brython_jinja2 import context as ctx
 from brython_jinja2 import expression as exp
-
+c = ctx.Context()
 e, _ = exp.parse('(1+4)*4+x')
 e.simplify()
+c.x = 10
+e.bind_ctx(c)
+
+e.solve(10, exp.IdentNode('x'))
 
 c.x = ctx.Immutable(6)
 e.bind_ctx(c)
 exp.simplify(e)
+
+from brython_jinja2 import expression as exp
+exp.parse('(10+30+1+10*/)+30')

@@ -198,19 +198,19 @@ def test_parse_interpolated_string():
     ctx = Context()
     ctx.name = 'Name'
 
-    asts = exp.parse_interpolated_str('Test text {{ 1+3 }} other text {{ "ahoj" }} final text.')
+    _, asts = exp.parse_interpolated_str('Test text {{ 1+3 }} other text {{ "ahoj" }} final text.')
     val = "".join([ast.evalctx(ctx) for ast in asts])
     assert val == 'Test text 4 other text ahoj final text.'
 
-    asts = exp.parse_interpolated_str('Test text {{ 1+3 }} other text {{ name }} final text.')
+    _, asts = exp.parse_interpolated_str('Test text {{ 1+3 }} other text {{ name }} final text.')
     val = "".join([ast.evalctx(ctx) for ast in asts])
     assert val == 'Test text 4 other text Name final text.'
 
-    asts = exp.parse_interpolated_str('Test text {{ 1+3 }} other text {{ len(name) }} final text.')
+    _, asts = exp.parse_interpolated_str('Test text {{ 1+3 }} other text {{ len(name) }} final text.')
     val = "".join([ast.evalctx(ctx) for ast in asts])
     assert val == 'Test text 4 other text 4 final text.'
 
-    asts = exp.parse_interpolated_str('Test text {{ "{{{{}}{}{}}}" }} other }}')
+    _, asts = exp.parse_interpolated_str('Test text {{ "{{{{}}{}{}}}" }} other }}')
     val = "".join([ast.evalctx(ctx) for ast in asts])
     assert val == 'Test text {{{{}}{}{}}} other }}'
 

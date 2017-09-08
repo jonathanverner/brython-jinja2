@@ -4,7 +4,8 @@
     instances of ``{{ }}``-type circular expressions.
 """
 from .utils.events import EventMixin
-from .expression import parse_interpolated_str
+from .expression import parse_interpolated_str, ConstNode
+
 
 
 class InterpolatedStr(EventMixin):
@@ -13,8 +14,8 @@ class InterpolatedStr(EventMixin):
         Use it as follows:
 
         ```
-            from circular.template.context import Context
-            from circular.template.interpolatedstr import InterpolatedStr
+            from brython_jinja2.context import Context
+            from brython_jinja2.interpolatedstr import InterpolatedStr
 
             c = context()
             istr = InterpolatedStr("Hello {{name}}, {{surname}}!")
@@ -32,7 +33,7 @@ class InterpolatedStr(EventMixin):
 
     """
 
-    def __init__(self, string, start='{{', end='}}'):
+    def __init__(self, string, start='{{', end='}}', stop_strs=[]):
         super().__init__()
         if isinstance(string, InterpolatedStr):
             # pylint: disable=protected-access; we are cloning ourselves, we have access to protected variables
@@ -41,8 +42,7 @@ class InterpolatedStr(EventMixin):
             for ast in string.asts:
                 self.asts.append(ast.clone())
         else:
-            self._src = string
-            self.asts = parse_interpolated_str(string, start=start, end=end)
+            self._src, self.asts = parse_interpolated_str(string, start=start, end=end, stop_strs=stop_strs)
 
         for ast_index in range(len(self.asts)):
             self.asts[ast_index].bind('change', lambda event, ast_index=ast_index: self._change_chandler(event, ast_index))
@@ -53,6 +53,12 @@ class InterpolatedStr(EventMixin):
         self._cached_val = ""
         self.evaluate()
 
+    def is_const(self):
+        for a in self.asts:
+            if not a.is_const():
+                return False
+        return True
+    
     def bind_ctx(self, context):
         for ast in self.asts:
             ast.bind_ctx(context)
@@ -101,6 +107,14 @@ class InterpolatedStr(EventMixin):
         self._cached_val = "".join(self._cached_vals)
         self._dirty = False
         
+    def rstrip(self):
+        ret = self.clone()
+        if ret.asts:
+            node = self.get_ast(-1, strip_str=True)
+            if isinstance(node, ConstNode):
+                node._cached_val = node._cached_val.rstrip()
+        return ret
+    
     def __str__(self):
         if self._dirty:
             return "InterpolatedStr("+self._src+")[=dirty:"+self.value+"]"

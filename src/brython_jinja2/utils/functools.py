@@ -60,3 +60,27 @@ def self_generator(func):
     def wrap(*args, **kw):
         return ProxyGenerator(func, args, kw)
     return wrap
+    
+@decorator
+def factory(cls):
+    
+    def register(cls, name):
+        @decorator
+        def dec(product):
+            cls.AVAILABLE[name]=product
+            return product
+        return dec
+        
+    def _filter(self, cond):
+        self.ACTIVE = { k:v for k,v in self.AVAILABLE.items() if cond(k) }
+        
+    def create(self, name, *args, **kwargs):
+        constr = self.ACTIVE[name]
+        return constr(name)
+        
+    cls.AVAILABLE = {}
+    cls.register = register
+    cls.create = create
+    cls._filter = _filter
+    
+    return cls
