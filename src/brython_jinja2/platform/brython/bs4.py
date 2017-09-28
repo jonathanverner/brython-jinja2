@@ -1,39 +1,37 @@
-from browser import document, window
+from browser import document, window, html
 
+html.ROOT = html.maketag('ROOT')
 
 def dom_from_html(html):
     """
-        Creates a DOM structure from :param:`html`
+        Creates a DOM structure from :param:`html`. The dom structure is
+        wrapped in a <ROOT> element.
     """
-    div = window.document.createElement('div')
-    div.innerHTML = html
-    return div.firstChild
+    return Tag(html.ROOT(html))
 
+def from_html(html):
+    div = html.DIV(html)
+    return from_native_element(div.firstChild)
 
-class NavigableString:
-    def __init__(self, string):
-        self._elt = document.createTextNode(string)
-        
-    def replace_with(self, string):
-        self._elt.set_text(string)
+def from_native_element(elt):
+    if elt.nodeType == elt.TEXT_NODE:
+        return NavigableString(elt.text)
+    elif elt.nodeType == elt.ELEMENT_NODE:
+        return Tag(elt)
+    else:
+        return None
+ 
+
+class Element:
+    def __init__(self, elt):
+        self._elt = elt
     
-class Tag:
-    def __init__(self, element_or_html):
-        if isinstance(element_or_html, str):
-            element_or_html = dom_from_html(element_or_html)
-        self._elt = element_or_html
-        if self._elt.nodeType == self._elt.ELEMENT_NODE:
-            self.name = self._elt.tagName
-
-    def get(self, key):
-        return self._elt.getAttribute(key)
-
     @property
     def parent(self):
         if self._elt.parentElement is None:
             return Document()
         else:
-            return Tag(self._elt.parentNode.elt)
+            return from_native_element(self._elt.parentElement)
 
     @property
     def parents(self):
@@ -44,7 +42,7 @@ class Tag:
 
     @property
     def next_sibling(self):
-        return Tag(self._elt.nextSibling)
+        return from_native_element(self._elt.nextSibling)
 
     @property
     def next_siblings(self):
@@ -52,10 +50,10 @@ class Tag:
         while sib is not None:
             yield sib
             sib = sib.next_sibling
-
+    
     @property
     def previous_sibling(self):
-        return Tag(self._elt.previousSibling)
+        return from_native_element(self._elt.previousSibling)
 
     @property
     def previous_siblings(self):
@@ -63,10 +61,14 @@ class Tag:
         while sib is not None:
             yield sib
             sib = sib.previous_sibling
-
+    
+    
     @property
     def next_element(self):
-        return Tag(self._elt.nextElementSibling)
+        if self._elt.firstChild is not None:
+            return from_native_element(self._elt.firstChild)
+        else:
+            return self.next_sibling
 
     @property
     def next_elements(self):
@@ -77,7 +79,7 @@ class Tag:
 
     @property
     def previous_element(self):
-        return Tag(self._elt.previousElementSibling)
+        return self.previous_sibling or self.parent
 
     @property
     def previous_elements(self):
@@ -86,33 +88,85 @@ class Tag:
             yield sib
             sib = sib.previous_element
 
+
+class NavigableString(Element):
+    def __init__(self, string):
+        super().__init__(document.createTextNode(string))
+      
+    def replace_with(self, string):
+        self._elt.set_text(string)
+
+class Attrs:
+    def __init__(self, elt):
+        self.elt = elt
+        
+    def keys(self):
+        return [a.name for a in self.elt.attributes]
+    
+    def items(self):
+        return [(a.name,a.value) for a in self.elt.attributes]
+    
+    def __setitem__(self, key, value):
+        self.elt[key] = value
+        
+    def __getitem__(self, key):
+        return self.elt[key]
+
+class Tag(Element):
+    def __init__(self, element_or_html):
+        if isinstance(element_or_html, str):
+            element_or_html = html.DIV(element_or_html).firstChild
+        self._elt = element_or_html
+        if self._elt.nodeType == self._elt.ELEMENT_NODE:
+            self.name = self._elt.tagName
+        else:
+            self.name  = None
+
+    def get(self, key):
+        return self._elt.getAttribute(key)
+    
+    @property
+    def attrs(self):
+        return Attrs(self)
+
     @property
     def contents(self):
-        return [Tag(ch) for ch in self._elt.children]
+        return [ch for ch in self.children]
 
     @property
     def children(self):
-        return iter(self.contents())
+        ch = self._elt.firstChild
+        while ch:
+            yield from_native_element(ch)
+            ch = ch.nextSibling
 
     @property
     def descendants(self):
-        for ch in self._elt.children:
-            t = Tag(ch)
-            yield t
-            for d in t.descendants:
+        for ch in self.children:
+            yield ch
+            for d in ch.descendants:
                 yield d
 
-    def append(self, tag_or_text):
-        if isinstance(tag_or_text, str):
-            self._elt.appendChild(dom_from_html(tag_or_text))
-        else:
-            self._elt.appendChild(tag_or_text._elt)
+    def extract(self) -> Element:
+        if self.parent:
+            self.parent._elt.removeChild(self._elt)
+        return self
 
-    def insert(self, pos, tag_or_text):
-        if isinstance(tag_or_text, str):
-            self._elt.insertBefore(dom_from_html(tag_or_text), self._elt.children[pos])
-        else:
-            self._elt.insertBefore(tag_or_text._elt, self._elt.children[pos])
+    def append(self, tag_or_html):
+        if isinstance(tag_or_html, str):
+            tag_or_html = from_html(tag_or_html)
+        self._elt.appendChild(tag_or_html._elt)
+
+    def insert(self, pos, tag_or_html):
+        if isinstance(tag_or_html, str):
+            tag_or_html = from_html(tag_or_html)
+        self._elt.insertBefore(tag_or_html._elt, self._elt.children[pos])
+        
+    def insert_before(self, tag):
+        self._elt.parentNode.insertBefore(tag._elt, self._elt)
+        
+    def insert_after(self, tag):
+        self._elt.parentNode.insertBefore(tag._elt, self._elt.nextSibling)
             
     def decompose(self):
         self._elt.remove()
@@ -203,7 +257,8 @@ class Document:
 
     @property
     def children(self):
-        return iter(self.contents)
+        for ch in window.document.children:
+            yield Tag(ch.elt)
 
     @property
     def descendants(self):

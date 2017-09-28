@@ -1,13 +1,19 @@
 from bs4 import BeautifulSoup, Tag
 
-
 def dom_from_html(html):
     """
-        Creates a DOM structure from :param:`html`
+        Creates a DOM structure from :param:`html`. The dom structure is
+        wrapped in a <ROOT> element.
     """
+    soup = BeautifulSoup('<root>'+html+'</root>', "html.parser")
+    return soup
 
-    soup = BeautifulSoup(html, "html.parser")
-    return soup.contents[0]
+def from_html(html):
+    soup = BeautifulSoup('<root>'+html+'</root>', "html.parser")
+    return soup.firstChild
+
+def from_native_element(elt):
+    return elt
 
 def __le__(self, other):
     self.append(other)
