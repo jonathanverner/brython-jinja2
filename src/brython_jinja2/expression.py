@@ -1712,7 +1712,7 @@ def parse(expr, trailing_garbage_ok=False, use_cache=True):
     return ast, pos
 
 
-def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False, end_token_vals=[]):
+def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False, end_token_vals=[]) -> (ExpNode, int, int):
     """
         Parses the `token_stream`, optionally stopping when an
         unconsumed token which is either a token in `end_tokens` or its string value is 

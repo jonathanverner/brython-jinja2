@@ -15,6 +15,7 @@ def generate_forward_handler(obj, forward_event):
 class EventError(Exception):
     pass
 
+
 class Event:
     """
         Event class encapsulating user data (:attribute:`data`)

@@ -19,7 +19,6 @@ def cat_while(string, pos, cond):
     return pos, ret
 
 
-
 class MultiMatcher:
     """
        Python implementation of Aho-Corasick string matching
