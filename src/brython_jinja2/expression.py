@@ -13,36 +13,42 @@
 # pylint: disable=protected-access; pylint doesn't allow descendants to use parent's protected variables.
 #                                   here they are used extensively by descendants of the ExpNode class.
 
+from .context import Context
 from .exceptions import ExpressionError, ExpressionSyntaxError, NoSolution, SkipSubtree
+from .platform import typing
+from .platform.typing import List, Dict, Optional, Tuple, Iterator, Union, NewType
 from .utils.events import EventMixin
 from .utils.observer import observe
 from .utils.functools import invertible, invert, self_generator
 from .utils import parser_utils as utils
 
+
 ET_EXPRESSION = 0
 ET_INTERPOLATED_STRING = 1
 
-T_SPACE = 0
-T_NUMBER = 1            # A number immediately preceded by '-' is a negative number, the '-' is not taken as an operator, so 10-11 is not a valid expression
-T_LBRACKET = 2
-T_RBRACKET = 3
-T_LPAREN = 4
-T_RPAREN = 5
-T_LBRACE = 6
-T_RBRACE = 7
-T_DOT = 8
-T_COMMA = 9
-T_COLON = 10
-T_OPERATOR = 11
-T_STRING = 12           # Started by " or '; there is NO distinction between backslash escaping between the two; """,''' and modifiers (e.g. r,b) not implemented"
-T_IDENTIFIER = 13       # Including True, False, None, an identifier starts by alphabetical character and is followed by alphanumeric characters and/or _$
-T_LBRACKET_INDEX = 14   # Bracket starting a list slice
-T_LBRACKET_LIST = 15    # Bracket starting a list
-T_LPAREN_FUNCTION = 16  # Parenthesis starting a function call
-T_LPAREN_EXPR = 17      # Parenthesis starting a subexpression
-T_EQUAL = 18
-T_KEYWORD = 19          # Warning: This does not include True,False,None; these fall in the T_IDENTIFIER category, also this includes 'in' which can, in certain context, be an operator
-T_UNKNOWN = 20
+Token = NewType('Token', int)
+
+T_SPACE = Token(0)
+T_NUMBER = Token(1)            # A number immediately preceded by '-' is a negative number, the '-' is not taken as an operator, so 10-11 is not a valid expression
+T_LBRACKET = Token(2)
+T_RBRACKET = Token(3)
+T_LPAREN = Token(4)
+T_RPAREN = Token(5)
+T_LBRACE = Token(6)
+T_RBRACE = Token(7)
+T_DOT = Token(8)
+T_COMMA = Token(9)
+T_COLON = Token(10)
+T_OPERATOR = Token(11)
+T_STRING = Token(12)           # Started by " or '; there is NO distinction between backslash escaping between the two; """,''' and modifiers (e.g. r,b) not implemented"
+T_IDENTIFIER = Token(13)       # Including True, False, None, an identifier starts by alphabetical character and is followed by alphanumeric characters and/or _$
+T_LBRACKET_INDEX = Token(14)   # Bracket starting a list slice
+T_LBRACKET_LIST = Token(15)    # Bracket starting a list
+T_LPAREN_FUNCTION = Token(16)  # Parenthesis starting a function call
+T_LPAREN_EXPR = Token(17)      # Parenthesis starting a subexpression
+T_EQUAL = Token(18)
+T_KEYWORD = Token(19)          # Warning: This does not include True,False,None; these fall in the T_IDENTIFIER category, also this includes 'in' which can, in certain context, be an operator
+T_UNKNOWN = Token(20)
 
 OP_PRIORITY = {
     '(': -2,    # Parenthesis have lowest priority so that we always stop partial evaluation when
@@ -68,7 +74,7 @@ OP_PRIORITY = {
 }
 
 
-def token_type(start_chars):
+def token_type(start_chars: str) -> Token:
     """ Identifies the next token type based on the next four characters """
     # pylint: disable=too-many-boolean-expressions
     # pylint: disable=too-many-return-statements
@@ -126,7 +132,7 @@ def token_type(start_chars):
         return T_UNKNOWN
 
 
-def parse_number(expr, pos):
+def parse_number(expr: str, pos: int) -> Tuple[float, int]:
     """ Parses a number """
     # pylint: disable=too-many-nested-blocks
     if expr[pos] == '-':
@@ -155,7 +161,7 @@ def parse_number(expr, pos):
         return ret, pos
 
 
-def parse_string(expr, pos):
+def parse_string(expr: str, pos: int) -> Tuple[str, int]:
     """ Parses a string, properly interpretting backslashes. """
     end_quote = expr[pos]
     backslash = False
@@ -187,7 +193,7 @@ def parse_string(expr, pos):
     return ret, pos + 1
 
 
-def parse_identifier(expr, pos):
+def parse_identifier(expr: str, pos: int):
     """
         Parses an identifier. Which should match /[a-z_$0-9]/i
     """
@@ -202,8 +208,10 @@ def parse_identifier(expr, pos):
     return ret, pos
 
 
+_TokenStream = Iterator[Tuple[Token, Union[float, str], int]]
+
 @self_generator
-def tokenize(self, expr):
+def tokenize(self, expr: str) -> _TokenStream:
     """
         A generator which takes a string and converts it to a
         stream of tokens, yielding the triples (token, its value, next position in the string)
@@ -345,7 +353,7 @@ class ExpNode(EventMixin):
         """
         return True
     
-    def solve(self, val, x):
+    def solve(self, val, x: ExpNode) -> None:
         """
             Tries to assign a value to x so that the subexpression rooted at this node evaluates to val. 
         """
@@ -383,7 +391,7 @@ class ExpNode(EventMixin):
         """
         raise NotImplementedError
 
-    def evalctx(self, context):
+    def evalctx(self, context: Context):
         """
             Evaluates the node looking up identifiers the context `context`. This method
             ignores any context previously set by the :func:`bind` method and also does
@@ -444,7 +452,7 @@ class ExpNode(EventMixin):
     def _assign(self, _val):
         raise ExpressionError("Assigning to " + str(self) + " not supported")
 
-    def bind_ctx(self, ctx):
+    def bind_ctx(self, ctx: Context):
         """
             Binds the node to the context `ctx` and starts watching the context for changes.
             When a change happens, it emits a `change` event. If the new value is known,
@@ -455,7 +463,7 @@ class ExpNode(EventMixin):
         """
         self._ctx = ctx
 
-    def clone(self):
+    def clone(self) -> 'ExpNode':
         """
             Returns a clone of this node which can bind a diffrent context.
         """
@@ -486,27 +494,27 @@ class ExpNode(EventMixin):
         return "<AST Node>"
     
     
-    def equiv(self, other, assume_equal=[]):
+    def equiv(self, other: ExpNode, assume_equal=[]):
         """
             Returns True if the subexpression rooted at the current node is always equal (regardless of the context)
             to the expression other if we assume that the identifiers in assume_equal are equal
         """
         return self == other
     
-    def contains(self, exp):
+    def contains(self, exp: ExpNode):
         """
             Returns true if the exp is a subexpression of the expression rooted at the current node.
         """
         return self.equiv(exp)
     
-    def __eq__(self, other):
+    def __eq__(self, other: ExpNode):
         return False
 
 
 class ConstNode(ExpNode):
     """ Node representing a string or number constant """
 
-    def __init__(self, val):
+    def __init__(self, val: Union[float, str]):
         super().__init__()
         self._dirty = False
         self._cached_val = val
@@ -520,17 +528,17 @@ class ConstNode(ExpNode):
     def eval(self, force_cache_refresh=False):
         return self._cached_val
 
-    def evalctx(self, context):
+    def evalctx(self, context: Context):
         return self._cached_val
 
-    def clone(self):
+    def clone(self) -> 'ConstNode':
         # Const Nodes can't change, so clones can be identical
         return self
     
     def __repr__(self):
         return repr(self._cached_val)
     
-    def __eq__(self, other):
+    def __eq__(self, other: ExpNode):
         return type(self) == type(other) and self._cached_val == other._cached_val
 
 
@@ -552,7 +560,7 @@ class IdentNode(ExpNode):
         'len': len
     }
 
-    def __init__(self, identifier):
+    def __init__(self, identifier: str):
         super().__init__()
         self._ident = identifier
         if self._ident in self.CONSTANTS:
@@ -595,7 +603,7 @@ class IdentNode(ExpNode):
     def name(self):
         return self._ident
 
-    def clone(self):
+    def clone(self) -> 'IdentNode':
         if self._const:
             return self
         else:
@@ -728,7 +736,7 @@ class MultiChildNode(ExpNode):
         else:
             return simplified_children
     
-    def clone(self):
+    def clone(self) -> List[ExpNode]:
         """
             Since MultiChildNode is an abstract node which is never instantiated,
             the clone method doesn't return the MultiChildNode but a list of cloned
@@ -1067,7 +1075,7 @@ class AttrAccessNode(ExpNode):
         if super()._visit(visitor, results):
             self._obj._visit(visitor, results)
         
-    def clone(self):
+    def clone(self) -> 'AttrAccessNode':
         return AttrAccessNode(self._obj.clone(), self._attr.clone())
     
     @property
@@ -1104,7 +1112,7 @@ class AttrAccessNode(ExpNode):
             self.defined = True
         return self._cached_val
 
-    def evalctx(self, context):
+    def evalctx(self, context: Context):
         """
            Note that this function expects the AST of the attr access to
            be rooted at the rightmost element of the attr access chain !!
@@ -1113,7 +1121,7 @@ class AttrAccessNode(ExpNode):
         obj_val = self._obj.evalctx(context)
         return getattr(obj_val, self._attr.name())
     
-    def solve(self, val, x):
+    def solve(self, val, x: ExpNode):
         if self.equiv(x):
             try:
                 self._assign(val)
@@ -1130,7 +1138,7 @@ class AttrAccessNode(ExpNode):
         self._observer = observe(self._cached_val, self._change_attr_handler, ignore_errors=True)
         self.defined = True
 
-    def bind_ctx(self, context):
+    def bind_ctx(self, context: Context):
         super().bind_ctx(context)
         if self._observer is not None:
             self._observer.unbind()
@@ -1149,7 +1157,7 @@ class AttrAccessNode(ExpNode):
             self._dirty = True
             self.emit('change', {})
 
-    def contains(self, exp):
+    def contains(self, exp: ExpNode):
         return self._obj.contains(exp) or self.equiv(exp)
     
     def __repr__(self):
@@ -1212,7 +1220,7 @@ class ListComprNode(ExpNode):
             else:
                 return ListComprNode(s_expr, self._var, s_lst, s_cond)
             
-    def solve(self, value, x):
+    def solve(self, value, x: ExpNode):
         if not isinstance(value, list):
             raise NoSolution(self, value, x)
         pos = 0
@@ -1227,7 +1235,7 @@ class ListComprNode(ExpNode):
                 new_val.append(c)
         self._lst._assign(new_val)
     
-    def clone(self):
+    def clone(self) -> 'ListComprNode':
         expr_c = self._expr.clone()
         var_c = self._var.clone()
         lst_c = self._lst.clone()
@@ -1253,7 +1261,7 @@ class ListComprNode(ExpNode):
             self._dirty = False
         return self._cached_val
 
-    def evalctx(self, context):
+    def evalctx(self, context: Context):
         lst = self._lst.evalctx(context)
         ret = []
         var_name = self._var.name()
@@ -1265,7 +1273,7 @@ class ListComprNode(ExpNode):
         context._restore(var_name)
         return ret
 
-    def bind_ctx(self, context):
+    def bind_ctx(self, context: Context):
         super().bind_ctx(context)
         self._lst.bind_ctx(context)
         self._expr.bind_ctx(context)
@@ -1273,7 +1281,7 @@ class ListComprNode(ExpNode):
             self._cond.bind_ctx(context)
         
 
-    def contains(self, exp):
+    def contains(self, exp: ExpNode):
         if self._lst.contains(exp):
             return True
         if self.var_name.equiv(exp):
@@ -1320,7 +1328,7 @@ class OpNode(ExpNode):
         '()': lambda func, args: func(*args[0], **args[1])
     }
 
-    def __init__(self, operator, l_exp, r_exp):
+    def __init__(self, operator:str, l_exp: ExpNode, r_exp: ExpNode):
         super().__init__()
         self._opstr = operator
         self._op = OpNode.OPS[operator]
@@ -1363,7 +1371,7 @@ class OpNode(ExpNode):
             return OpNode(self._opstr, s_l, s_r)
             
         
-    def clone(self):
+    def clone(self) -> 'OpNode':
         if self._larg is None:
             l_exp = None
         else:
@@ -1391,7 +1399,7 @@ class OpNode(ExpNode):
             self._dirty = False
         return self._cached_val
 
-    def evalctx(self, context):
+    def evalctx(self, context: Context):
         if self._opstr in self.UNARY:
             return self._op(self._rarg.evalctx(context))
         else:
@@ -1451,7 +1459,7 @@ class OpNode(ExpNode):
         except:
             raise NoSolution(self, val, x)
         
-    def solve(self, val, x):
+    def solve(self, val, x: ExpNode):
         if self._opstr == '-unary':
             if not self._rarg.equiv(x):
                 raise NoSolution(self, val, x)
@@ -1495,13 +1503,13 @@ class OpNode(ExpNode):
         self._larg.value[self._rarg.value] = value
         self.defined = True
 
-    def bind_ctx(self, context):
+    def bind_ctx(self, context: Context):
         super().bind_ctx(context)
         if self._opstr not in self.UNARY:
             self._larg.bind_ctx(context)
         self._rarg.bind_ctx(context)
         
-    def contains(self, exp):
+    def contains(self, exp: ExpNode):
         if self._larg is not None and self._larg.contains(exp):
             return True
         return self._rarg.contains(exp) or self.equiv(exp)
@@ -1534,14 +1542,14 @@ class OpNode(ExpNode):
         return type(self) == type(other) and self._op == other._op and self._larg == other._larg and self._rarg == other._rarg
 
 
-def simplify(exp):
+def simplify(exp: ExpNode) -> ExpNode:
     if exp._ctx is None:
         return exp.simplify()
     else:
         assume_const = [IdentNode(a) for a in exp._ctx.immutable_attrs]
         return exp.simplify(assume_const)     
 
-def partial_eval(arg_stack, op_stack, pri=-1, src=None, location=None):
+def partial_eval(arg_stack: List[ExpNode], op_stack, pri=-1, src=None, location=None) -> None:
     """ Partially evaluates the stack, i.e. while the operators in @op_stack have strictly
         higher priority then @pri, they are converted to OpNodes/AttrAccessNodes with
         arguments taken from the @arg_stack. The result is always placed back on the @arg_stack"""
@@ -1561,8 +1569,8 @@ def partial_eval(arg_stack, op_stack, pri=-1, src=None, location=None):
             raise ExpressionSyntaxError("Not enough arguments for operator '" + operator + "'", src=src, location=location)
 
 
-def parse_args(token_stream):
-    """ Parses function arguments from the stream and returns them as a pair (args,kwargs)
+def parse_args(token_stream: _TokenStream) -> Tuple[List[ExpNode], Dict[str, ExpNode]]:
+    """ Parses function arguments from the stream and returns them as a pair (args, kwargs)
         where the first is a list and the second a dict """
     args = []
     kwargs = {}
@@ -1585,7 +1593,7 @@ def parse_args(token_stream):
     return args, kwargs
 
 
-def parse_lst(token_stream):
+def parse_lst(token_stream: _TokenStream) -> Union[ListComprNode, ListNode]:
     """ Parses a list constant or list comprehension from the token_stream
         and returns the appropriate node """
     elem, endt, _pos = _parse(token_stream, [T_RBRACKET, T_COMMA, T_KEYWORD])
@@ -1606,7 +1614,7 @@ def parse_lst(token_stream):
         return ListNode(lst)
 
 
-def parse_slice(token_stream):
+def parse_slice(token_stream: _TokenStream) -> Tuple[bool, ExpNode, ExpNode, ExpNode]:
     """ Parses a slice (e.g. a:b:c) or index from the token_stream and returns the slice as a quadruple,
         the first element of which indicates whether it is a slice (True) or an index (False)
     """
@@ -1686,7 +1694,7 @@ def parse_interpolated_str(tpl_expr, start='{{', end='}}', stop_strs=[]):
 _PARSE_CACHE = {}
 
 
-def parse(expr, trailing_garbage_ok=False, use_cache=True):
+def parse(expr: str, trailing_garbage_ok: bool=False, use_cache: bool=True) -> Tuple[ExpNode, int]:
     """
         Parses the expression :param:`expr` into an AST tree of
         :class:`ExpNode` instances. If trailing_garbage_ok is set
@@ -1712,7 +1720,7 @@ def parse(expr, trailing_garbage_ok=False, use_cache=True):
     return ast, pos
 
 
-def _parse(token_stream, end_tokens=[], trailing_garbage_ok=False, end_token_vals=[]) -> (ExpNode, int, int):
+def _parse(token_stream: _TokenStream, end_tokens=[], trailing_garbage_ok=False, end_token_vals=[]) -> Tuple[ExpNode, Optional[Token], int]:
     """
         Parses the `token_stream`, optionally stopping when an
         unconsumed token which is either a token in `end_tokens` or its string value is 

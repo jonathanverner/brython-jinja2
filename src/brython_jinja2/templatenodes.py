@@ -6,14 +6,16 @@ from . import lexer
 from .context import Context
 from .platform import bs4
 from .platform import typing
+from .platform.typing import List, Dict, Optional, Tuple, Iterable, Callable
 from .utils.delayedupdater import DelayedUpdater
+
 
 _NODE_BEGIN_MARKER='data-jinja-tpl-node-'
 _NODE_END_MARKER='_'
 
 
 class Node(DelayedUpdater):
-    def __init__(self, parser, token_stream: lexer.TokenStream, location: typing.Optional[lexer.Location]=None):
+    def __init__(self, parser, token_stream: lexer.TokenStream, location: Optional[lexer.Location]=None):
         if location is None:
             self._location = lexer.Location()
         else:
@@ -37,7 +39,7 @@ class Node(DelayedUpdater):
             html+=ch._html_ref(num)
         return html
             
-    def render_dom(self) -> typing.List[bs4.Tag]:
+    def render_dom(self) -> List[bs4.Tag]:
         root = bs4.dom_from_html(self._get_html_content())
         t_el = _TemplatedTag(root, self, self._children)
         self._rendered = [ch.extract() for ch in t_el.children]
@@ -107,14 +109,14 @@ class NodeFactory:
             raise exceptions.TemplateSyntaxError("Unknown (or disabled) tag: "+name, src=tokenstream.src, location=location)
         return self.active[name](parser, tokenstream, location)
         
-def register_node(NodeName: str) -> typing.Callable[[type], type]:
+def register_node(NodeName: str) -> Callable[[type], type]:
     def decorator(cls: type) -> type:
         NodeFactory.register(NodeName, cls)
         return cls
     return decorator
 
 class _TemplatedTag(bs4.Element):
-    def __init__(self, elt: bs4.Tag, node_map: typing.Dict[int, Node]):
+    def __init__(self, elt: bs4.Tag, node_map: Dict[int, Node]):
         self._elt = bs4.Tag(elt.name)
         self._dynamic_attrs = []
         for ch in elt.children:
@@ -140,7 +142,7 @@ class _TemplatedTag(bs4.Element):
                 self._dynamic_attrs.append(_TemplatedValAttr(self, name, val, node_map))
             
 class _TemplatedValAttr:
-    def __init__(self, elt: bs4.Tag, name: str, value: str, nodes: typing.List[Node]):
+    def __init__(self, elt: bs4.Tag, name: str, value: str, nodes: List[Node]):
         self._elt = elt
         self._name = name
         self._components = []
