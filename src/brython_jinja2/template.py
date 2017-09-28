@@ -17,7 +17,7 @@ class Template(events.EventMixin):
         self._update_scheduled = False
         self._update_interval = update_interval
         self._errors = []
-        
+
     @coroutine
     def render(self, ctx, into):
         for node in self.ast:
@@ -29,7 +29,7 @@ class Template(events.EventMixin):
             except Exception as ex:
                 self._errors.append((node, ex))
                 print("Error rendering "+str(node)+":"+str(ex))
-    
+
     @coroutine
     def _schedule_update(self, evt):
         if self._update_scheduled:
@@ -38,11 +38,11 @@ class Template(events.EventMixin):
         yield sleep(self._update_interval)
         self._update()
         self._update_scheduled = False
-        
+
     def _update(self):
         for rn in self._rendered_nodes:
             rn.update_if_needed()
-    
+
     def destroy(self):
         for rn in self._rendered_nodes:
             rn.unbind('change')

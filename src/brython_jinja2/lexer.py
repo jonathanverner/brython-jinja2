@@ -56,16 +56,16 @@ class TokenStream:
         self.token_map = list(tmap)+[(T_SPACE,' ')]
         self.src = src
         self.left = []
-        
+
     def push_left(self, token, val, pos):
         self.left.append((token,val, pos))
-        
+
     def pop_left(self):
         return next(self)
-    
+
     def peek(self):
         return self._next_tok(advance=False)
-        
+
     def skip(self, tokens):
         if type(tokens) == int:
             rest = tokens-len(self.left)
@@ -75,7 +75,7 @@ class TokenStream:
                 rest -= 1
         else:
             self.cat_while(tokens)
-        
+
     def cat_until(self, tokens):
         ret = ''
         toks=[]
@@ -87,7 +87,7 @@ class TokenStream:
                 toks.append((t,val,loc))
                 ret += val
         raise exceptions.EOSException("End of stream while looking for TOKENS "+str([token_repr(t) for t in tokens]), src=self.src, location=self.loc)
-        
+
     def cat_while(self, tokens):
         ret = ''
         t, val, pos = next(self)
@@ -96,7 +96,7 @@ class TokenStream:
             t, val, pos = next(self)
         self.push_left(t, val, pos)
         return ret
-    
+
     def _next_tok(self, advance=True):
         old_loc = self.loc.clone()
         if len(self.left) > 0:
@@ -120,24 +120,24 @@ class TokenStream:
         if advance:
             self.loc._inc_pos()
         return (T_OTHER, self.src[old_loc.pos], old_loc)
-    
+
     def find(self, needle):
         return self[:].find(needle)
-    
+
     def __len__(self):
         return len(self.left)+len(self.src)
-    
+
     def __getitem__(self, key):
         return self.remain_src[key]
-        
+
     @property
     def remain_src(self):
         return ''.join([ t[1] for t in self.left ])+self.src[self.loc.pos:]
-        
+
 
     def __iter__(self):
         return self
-    
+
     def __next__(self):
         try:
             return self._next_tok(advance=True)

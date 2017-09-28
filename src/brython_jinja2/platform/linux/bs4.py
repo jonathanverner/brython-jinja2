@@ -1,4 +1,4 @@
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, Tag, PageElement, NavigableString
 
 def dom_from_html(html):
     """
@@ -31,9 +31,9 @@ class doc(BeautifulSoup):
 
     def __le__(self, other):
         self.append(other)
-        
+
     def insert_after(self, elt):
         raise NotImplementedError()
-    
+
     def insert_before(self, elt):
         raise NotImplementedError()

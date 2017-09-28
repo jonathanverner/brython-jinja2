@@ -237,6 +237,7 @@ def _tokenize(self, expr: str) -> Iterator[Tuple[Token, Any, int]]:
     """
     # pylint: disable=too-many-branches; python doesn't have a switch statement
     # pylint: disable=too-many-statements; the length is just due to the many token types
+
     self._src = expr
     pos = 0
     while pos < len(expr):
@@ -343,17 +344,17 @@ class ExpNode(EventMixin):
         # should be set to True and only reset to False on a
         # subsequent call to evaluate.
         self._dirty = True
-        
+
     def _visit(self, visitor, results):
         """
-            Calls the function visitor with the `results` list as the first argument and 
+            Calls the function visitor with the `results` list as the first argument and
             the current node as the second argument. The return value, if not None, is paired
             with the current node and appended to the `results` list. Then it iteratively
             does the same for each of its children.
-            
+
             If the visitor raises StopIteration, the whole process is stopped. If the visitor
             raises the SkipSubTree exception, the children of this node are not visited.
-            
+
             The base implementation in ExpNode returns True, if children should be visited
             and False otherwise (e.g. if the visitor raised the `SkipSubTree` exception)
         """
@@ -364,7 +365,7 @@ class ExpNode(EventMixin):
         if ret is not None:
             results.append((self, ret))
         return True
-        
+
     def is_const(self, assume_const=[]):
         """
             Returns true if the subexpression rooted at this node has constant value (i.e. independent of the context).
@@ -374,12 +375,12 @@ class ExpNode(EventMixin):
 
     def solve(self, val, x: 'ExpNode') -> None:
         """
-            Tries to assign a value to x so that the subexpression rooted at this node evaluates to val. 
+            Tries to assign a value to x so that the subexpression rooted at this node evaluates to val.
         """
         if self._ctx is None:
             raise ExpressionError("Cannot solve without a context", src=str(self))
         raise NoSolution(self, val, x)
-    
+
     @property
     def mutable(self):
         """
@@ -388,7 +389,7 @@ class ExpNode(EventMixin):
         if not self._ctx:
             raise ExpressionError("Mutable_val makes sense only for bound expressions.", src=str(self))
         return False
-    
+
     def simplify(self, assume_const=[]):
         """
             Simplifies the subexpression rooted at this node by evaluating nodes which are const (i.e. `is_const` is true)
@@ -498,11 +499,11 @@ class ExpNode(EventMixin):
     def is_assignable(self):
         """
             Returns true if the expression value can be assigned to.
-            
+
             (alias of the mutable property)
         """
         return self.mutable
-    
+
     def _change_handler(self, _event):
         if self._dirty and self.defined:
             return
@@ -537,7 +538,7 @@ class ConstNode(ExpNode):
         super().__init__()
         self._dirty = False
         self._cached_val = val
-        
+
     def is_const(self, assume_const=[]):
         return True
 
@@ -553,7 +554,7 @@ class ConstNode(ExpNode):
     def clone(self) -> 'ConstNode':
         # Const Nodes can't change, so clones can be identical
         return self
-    
+
     def __repr__(self):
         return repr(self._cached_val)
 
@@ -591,7 +592,7 @@ class IdentNode(ExpNode):
             self._ctx_observer = None
         else:
             self._const = False
-            
+
     @property
     def mutable(self):
         if self._const:
@@ -599,20 +600,20 @@ class IdentNode(ExpNode):
         if self._ctx is None:
             return True
         return self._ident not in self._ctx.immutable_attrs
-    
+
     def is_const(self, assume_const=[]):
         if self._const:
             return True
         else:
             return self._ident in [e._ident for e in assume_const if isinstance(e, IdentNode)]
-        
+
     def solve(self, value, x):
         if self._const:
             raise NoSolution(self, value, x)
         if self.equiv(x):
             self._assign(value)
-            
-        
+
+
     def simplify(self, assume_const=[]):
         if self.is_const(assume_const):
             return ConstNode(self.eval())
@@ -698,7 +699,7 @@ class IdentNode(ExpNode):
 
     def __repr__(self):
         return self.name()
-    
+
     def __eq__(self, other):
         return type(self) == type(other) and self._ident == other._ident
 
@@ -731,7 +732,7 @@ class MultiChildNode(ExpNode):
             if ch is not None and not ch.is_const(assume_const):
                 return False
         return True
-    
+
     def simplify(self, assume_const=[]):
         """
             Since MultiChildNode is an abstract node which is never instantiated,
@@ -813,13 +814,13 @@ class MultiChildNode(ExpNode):
         if not self._dirty or not self.defined:
             self._dirty = True
             self.emit('change')
-            
+
     def contains(self, exp):
         for ch in self._children:
             if ch.contains(exp):
                 return True
         return self.equiv(exp)
-            
+
     def __eq__(self, other):
         if not type(other) == type(self):
             return False
@@ -836,7 +837,7 @@ class ListNode(MultiChildNode):
 
     def __init__(self, lst):
         super().__init__(lst)
-        
+
     # This class does not have an eval method of its own.
     # This means that, temporarily, the `_cached_val` need not
     # reflect the real cached value, which is stored in
@@ -844,18 +845,18 @@ class ListNode(MultiChildNode):
     # by the parent value getter when it is called.
     def clone(self):
         return ListNode(super().clone())
-    
+
     def simplify(self, assume_const=[]):
         simplified_children = super().simplify(assume_const)
         if isinstance(simplified_children, ConstNode):
             return simplified_children
         else:
             return ListNode(simplified_children)
-        
+
     def solve(self, val, x):
         if not isinstance(val, list) or len(self._children) != len(val):
             raise NoSolution(self, val, x)
-        
+
         solve_val = None
         solve_exp = None
         for index, ch in enumerate(self._children):
@@ -888,7 +889,7 @@ class FuncArgsNode(MultiChildNode):
         if super()._visit(visitor, results):
             for ch in self._kwargs:
                 ch._visit(visitor, results)
-    
+
     def clone(self):
         cloned_args = super().clone()
         cloned_kwargs = {}
@@ -903,7 +904,7 @@ class FuncArgsNode(MultiChildNode):
             if not kwarg.is_const(assume_const):
                 return False
         return True
-    
+
     def simplify(self, assume_const=[]):
         s_args = super().simplify(assume_const)
         s_kwargs = {}
@@ -919,8 +920,8 @@ class FuncArgsNode(MultiChildNode):
             else:
                 return FuncArgsNode([ConstNode(arg) for arg in s_args.eval()], s_kwargs)
         else:
-                return FuncArgsNode(s_args, s_kwargs)
-        
+            return FuncArgsNode(s_args, s_kwargs)
+
     def eval(self, force_cache_refresh=False):
         args = super().eval(force_cache_refresh=force_cache_refresh)
         if self._dirty_kwargs or force_cache_refresh:
@@ -964,11 +965,11 @@ class FuncArgsNode(MultiChildNode):
             if val.contains(exp):
                 return True
         return self.equiv(exp)
-        
+
     def __repr__(self):
         return ','.join([repr(child) for child in self._children] +
                         [arg + '=' + repr(val) for (arg, val) in self._kwargs.items()])
-    
+
     def __eq__(self, other):
         if not super().__eq__(other):
             return False
@@ -985,26 +986,26 @@ class ConstFuncArgsNode(ExpNode):
     def __init__(self, args, kwargs):
         self._args =  args
         self._kwargs = kwargs
-    
+
     def clone(self):
         return ConstFuncArgsNode(self._args, self._kwargs)
-    
+
     def is_const(self, assume_const=[]):
         return True
-    
+
     def eval(self, force_cache_refresh=False):
         return self._args, self._kwargs
-    
+
     def evalctx(self, context):
         return self.eval()
-    
+
     def bind_ctx(self, ctx):
         self._ctx = ctx
 
     def __repr__(self):
         return ','.join([repr(arg) for arg in self._args] +
                         [arg + '=' + repr(val) for (arg, val) in self._kwargs.items()])
-    
+
     def __eq__(self, other):
         if type(self) != type(other):
             return False
@@ -1036,7 +1037,7 @@ class ListSliceNode(MultiChildNode):
                 return ListSliceNode(self._slice, *args)
         else:
             return self._children[0].simplify(assume_const)
-        
+
     def clone(self):
         # pylint: disable=unbalanced-tuple-unpacking; we know we are a ListSlice so super().clone will return three children
         start_c, end_c, step_c = super().clone()
@@ -1078,8 +1079,8 @@ class ListSliceNode(MultiChildNode):
             return ret
         else:
             return repr(start)
-      
-    
+
+
 class AttrAccessNode(ExpNode):
     """ Node representing attribute access, e.g. obj.prop """
 
@@ -1093,21 +1094,21 @@ class AttrAccessNode(ExpNode):
     def _visit(self, visitor, results):
         if super()._visit(visitor, results):
             self._obj._visit(visitor, results)
-        
+
     def clone(self) -> 'AttrAccessNode':
         return AttrAccessNode(self._obj.clone(), self._attr.clone())
-    
+
     @property
     def mutable(self):
         if self._ctx is None:
             return True
         else:
             return self._obj.mutable
-    
-    
+
+
     def is_const(self, assume_const=[]):
         return self._obj.is_const(assume_const)
-    
+
     def simplify(self, assume_const=[]):
         s_obj = self._obj.simplify(assume_const)
         if s_obj.is_const():
@@ -1139,7 +1140,7 @@ class AttrAccessNode(ExpNode):
 
         obj_val = self._obj.evalctx(context)
         return getattr(obj_val, self._attr.name())
-    
+
     def solve(self, val, x: ExpNode):
         if self.equiv(x):
             try:
@@ -1178,10 +1179,10 @@ class AttrAccessNode(ExpNode):
 
     def contains(self, exp: ExpNode):
         return self._obj.contains(exp) or self.equiv(exp)
-    
+
     def __repr__(self):
         return repr(self._obj) + '.' + repr(self._attr)
-    
+
     def __eq__(self, other):
         if type(self) != type(other):
             return False
@@ -1207,10 +1208,10 @@ class ListComprNode(ExpNode):
             self._expr._visit(visitor, results)
             self._lst._visit(visitor, results)
             self._cond._visit(visitor, results)
-            
+
     def is_const(self, assume_const=[]):
         return self._lst.is_const(assume_const) and self._expr.is_const(assume_const=assume_const+[self._var])
-    
+
     def simplify(self, assume_const=[]):
         mod_const = [e for e in assume_const if not e.isinstance(IdentNode) or e._ident != self._var.name()]
         s_lst = self._lst.simplify(assume_const)
@@ -1219,7 +1220,7 @@ class ListComprNode(ExpNode):
         else:
             s_cond = None
         s_expr = self._expr.simplify(mod_const)
-        
+
         if s_cond is not None and s_cond.is_const(mod_const):
             if not s_cond.eval():
                 return ConstNode([])
@@ -1238,7 +1239,7 @@ class ListComprNode(ExpNode):
                 return ListComprNode(s_expr, self._var, s_lst.eval(), s_cond)
             else:
                 return ListComprNode(s_expr, self._var, s_lst, s_cond)
-            
+
     def solve(self, value, x: ExpNode):
         if not isinstance(value, list):
             raise NoSolution(self, value, x)
@@ -1253,7 +1254,7 @@ class ListComprNode(ExpNode):
             else:
                 new_val.append(c)
         self._lst._assign(new_val)
-    
+
     def clone(self) -> 'ListComprNode':
         expr_c = self._expr.clone()
         var_c = self._var.clone()
@@ -1298,7 +1299,7 @@ class ListComprNode(ExpNode):
         self._expr.bind_ctx(context)
         if self._cond is not None:
             self._cond.bind_ctx(context)
-        
+
 
     def contains(self, exp: ExpNode):
         if self._lst.contains(exp):
@@ -1306,7 +1307,7 @@ class ListComprNode(ExpNode):
         if self._var.equiv(exp):
             return False
         return self._expr.contains(exp) or self._cond.contains(exp) or self.equiv(exp)
-    
+
     def __repr__(self):
         if self._cond is None:
             return '[' + repr(self._expr) + ' for ' + \
@@ -1317,7 +1318,7 @@ class ListComprNode(ExpNode):
 
     def __eq__(self, other):
         return type(self) == type(other) and self._var == other._var and self._cond == other._cond and self._expr == other._expr and self._lst == other._lst
-        
+
 
 class OpNode(ExpNode):
     """ Node representing an operation, e.g. a is None, a**5, a[10], a.b or func(x,y)"""
@@ -1345,7 +1346,6 @@ class OpNode(ExpNode):
         'is not': lambda x, y: x is not y,
         '[]': lambda x, y: x[y],
         '()': lambda func, args: func(*args[0], **args[1])
-    }
     } # type: Dict[str, Callable]
 
     def __init__(self, operator:str, l_exp: ExpNode, r_exp: ExpNode) -> None:
@@ -1369,13 +1369,13 @@ class OpNode(ExpNode):
         if self._opstr == '[]':
             return self._larg.mutable and isinstance(self._rarg, ListSliceNode) and not self._rarg._slice
         return False
-    
+
     def is_const(self, assume_const=[]):
         if self._larg is not None:
             return self._larg.is_const(assume_const) and self._rarg.is_const(assume_const)
         else:
             return self._rarg.is_const(assume_const)
-        
+
     def simplify(self, assume_const=[]):
         if self._larg is not None:
             s_l = self._larg.simplify(assume_const)
@@ -1389,8 +1389,8 @@ class OpNode(ExpNode):
                 return OpNode(self._opstr, s_l, s_r)
         else:
             return OpNode(self._opstr, s_l, s_r)
-            
-        
+
+
     def clone(self) -> 'OpNode':
         if self._larg is None:
             l_exp = None
@@ -1443,7 +1443,7 @@ class OpNode(ExpNode):
         args_copy.extend(inject_args)
         kwargs_copy.update(inject_kwargs)
         return func(*args_copy, **kwargs_copy)
-    
+
     def _solve_func(self, val, x):
         func = self._larg.eval()
         if not invertible(func):
@@ -1466,7 +1466,7 @@ class OpNode(ExpNode):
                 args[i] = val
                 exp = v
         exp.solve(inverse(*args, **kwargs), x)
-        
+
     def _to_number(self, x, val):
         if type(val) in [int, float]:
             return val
@@ -1478,7 +1478,7 @@ class OpNode(ExpNode):
             return float(val)
         except:
             raise NoSolution(self, val, x)
-        
+
     def solve(self, val, x: ExpNode):
         if self._opstr == '-unary':
             if not self._rarg.equiv(x):
@@ -1516,7 +1516,7 @@ class OpNode(ExpNode):
             raise NoSolution(self, val, x)
         else:
             raise NoSolution(self, val, x)
-        
+
     def _assign(self, value):
         if self._opstr != '[]':
             raise ExpressionError("Assigning to "+repr(self)+" does not make sense.")
@@ -1528,7 +1528,7 @@ class OpNode(ExpNode):
         if self._opstr not in self.UNARY:
             self._larg.bind_ctx(context)
         self._rarg.bind_ctx(context)
-        
+
     def contains(self, exp: ExpNode):
         if self._larg is not None and self._larg.contains(exp):
             return True
@@ -1557,7 +1557,7 @@ class OpNode(ExpNode):
                 r_repr = repr(self._rarg)
 
             return l_repr + ' ' + self._opstr + ' ' + r_repr
-        
+
     def __eq__(self, other):
         return type(self) == type(other) and self._op == other._op and self._larg == other._larg and self._rarg == other._rarg
 
@@ -1567,7 +1567,7 @@ def simplify(exp: ExpNode) -> ExpNode:
         return exp.simplify()
     else:
         assume_const = [IdentNode(a) for a in exp._ctx.immutable_attrs]
-        return exp.simplify(assume_const)     
+        return exp.simplify(assume_const)
 
 def partial_eval(arg_stack: List[ExpNode], op_stack, pri=-1, src=None, location=None) -> None:
     """ Partially evaluates the stack, i.e. while the operators in @op_stack have strictly
@@ -1661,7 +1661,7 @@ def parse_slice(token_stream: _TokenStream) -> Tuple[bool, ExpNode, ExpNode, Exp
 
 def my_find(haystack, needle, stop_strs):
     pass
-    
+
 
 def parse_interpolated_str(tpl_expr, start='{{', end='}}', stop_strs=[]):
     """ Parses a string of the form
@@ -1676,17 +1676,17 @@ def parse_interpolated_str(tpl_expr, start='{{', end='}}', stop_strs=[]):
         ```
           ["Test text ",str(exp)," other text ",str(exp2)," final text."]
         ```
-        
+
         Args:
             start (str): the string opening an expression (defaults to '{{')
             end (str):   the string closing an expression (defaults to '}}')
-            stop_strs list[str]: Optionally stop parsing when reaching stop_str 
+            stop_strs list[str]: Optionally stop parsing when reaching stop_str
                 outside of an expression
-        
+
         Returns:
             str, list[ExpNode]: The parsed part of the string, a list of asts representing the text (ConstNodes)
                  and asts of the expressions
-                           
+
         Raises:
             ExpressionSyntaxError: In case either one of the expressions is not
                 a valid expression or if one of the expressions is not closed
@@ -1749,16 +1749,16 @@ def parse(expr: str, trailing_garbage_ok: bool=False, use_cache: bool=True) -> T
 def _parse(token_stream: _TokenStream, end_tokens=[], trailing_garbage_ok=False, end_token_vals=[]) -> Tuple[ExpNode, Optional[Token], int]:
     """
         Parses the `token_stream`, optionally stopping when an
-        unconsumed token which is either a token in `end_tokens` or its string value is 
+        unconsumed token which is either a token in `end_tokens` or its string value is
         in `end_tokens`.
-        
+
         Args:
             token_stream (iterator): The token stream
             end_tokens (list): A list of stop token classes and stop token values
-        
+
         Returns:
             triple: the parsed tree, last token seen, next position
-            
+
             The parsed tree may be None if the `token_stream` is empty.
             `next_position` corresponds to the next position in the source string.
 

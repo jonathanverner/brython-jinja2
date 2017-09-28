@@ -1,9 +1,9 @@
 import asyncio
 
 def decorator(dec):
-    def new_dec(fn):
-        ret = dec(fn)
-        ret.__decorated = fn
+    def new_dec(func):
+        ret = dec(func)
+        ret.__decorated = func # pylint: disable=W0212
         return ret
     return new_dec
 
@@ -21,26 +21,26 @@ def inverts(func):
         This decorator indicates that the decorated function is the inverse to `func`
     """
     @decorator
-    def dec(f):
-        f.__inverse = func
-        func.__inverse = f
+    def decorated(f):
+        f.__inverse = func # pylint: disable=W0212
+        func.__inverse = f # pylint: disable=W0212
         return f
-    return dec
+    return decorated
 
 
 def invertible(func):
     """
         Returns true if the function `func` is invertible.
     """
-    return hasattr(func,'__inverse')
+    return hasattr(func, '__inverse')
 
 
 def invert(func):
     """
         Returns the inverse to function `func`
     """
-    return func.__inverse
-        
+    return func.__inverse # pylint: disable=W0212
+
 
 # The following is taken from https://stackoverflow.com/questions/21808113/is-there-anything-similar-to-self-inside-a-python-generator
 
@@ -59,23 +59,23 @@ class ProxyGenerator(object):
 
 @decorator
 def self_generator(func):
-    def wrap(*args, **kw):
+    def wrap(*args, **kw) -> ProxyGenerator:
         return ProxyGenerator(func, args, kw)
     return wrap
-    
+
 @decorator
 def factory(cls):
-    
+
     def register(cls, name):
         @decorator
         def dec(product):
-            cls.AVAILABLE[name]=product
+            cls.AVAILABLE[name] = product
             return product
         return dec
-        
+
     def _filter(self, cond):
-        self.ACTIVE = { k:v for k,v in self.AVAILABLE.items() if cond(k) }
-        
+        self.ACTIVE = {k:v for k, v in self.AVAILABLE.items() if cond(k)}
+
     def create(self, name, *args, **kwargs):
         constr = self.ACTIVE[name]
         return constr(*args, **kwargs)
@@ -83,8 +83,8 @@ def factory(cls):
     cls.AVAILABLE = {}
     cls.register = register
     cls.create = create
-    cls._filter = _filter
-    
+    cls._filter = _filter # pylint: disable=W0212
+
     return cls
 
 def throttle(sec: float):
@@ -95,14 +95,18 @@ def throttle(sec: float):
         (effectively allowing at most 1 call in the given number of seconds).
     """
     @decorator
-    def throttle_decorator(fn):
+    def throttle_decorator(func):
+        _throttle = False
+
         @asyncio.coroutine
-        def f(*args, **kwargs):
-            if f._throttle:
+        def decorated(*args, **kwargs):
+            if _throttle:
                 return
-            f._throttle = True
+            _throttle = True
             yield asyncio.sleep(sec)
-            fn(*args, **kwargs)
-            f._throttle = False
-        return f
+            func(*args, **kwargs)
+            _throttle = False
+
+        return decorated
+
     return throttle_decorator
