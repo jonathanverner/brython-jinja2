@@ -1,3 +1,5 @@
+import asyncio
+
 def decorator(dec):
     def new_dec(fn):
         ret = dec(fn)
@@ -84,3 +86,23 @@ def factory(cls):
     cls._filter = _filter
     
     return cls
+
+def throttle(sec: float):
+    """
+        A decorator which turns the decorated function/method into a coroutine.
+        The coroutine waits for `sec` seconds and then calls the decorated function.
+        If the coroutine is called while another call is waiting, it does nothing
+        (effectively allowing at most 1 call in the given number of seconds).
+    """
+    @decorator
+    def throttle_decorator(fn):
+        @asyncio.coroutine
+        def f(*args, **kwargs):
+            if f._throttle:
+                return
+            f._throttle = True
+            yield asyncio.sleep(sec)
+            fn(*args, **kwargs)
+            f._throttle = False
+        return f
+    return throttle_decorator
