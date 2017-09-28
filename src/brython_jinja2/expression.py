@@ -16,7 +16,7 @@
 from .context import Context
 from .exceptions import ExpressionError, ExpressionSyntaxError, NoSolution, SkipSubtree
 from .platform import typing
-from .platform.typing import List, Dict, Optional, Tuple, Iterator, Union, NewType
+from .platform.typing import List, Dict, Optional, Tuple, Iterator, Union, NewType, cast, Any, Iterable, Callable, TypeVar
 from .utils.events import EventMixin
 from .utils.observer import observe
 from .utils.functools import invertible, invert, self_generator
@@ -140,7 +140,7 @@ def parse_number(expr: str, pos: int) -> Tuple[float, int]:
         pos = pos + 1
     else:
         negative = False
-    ret = int(expr[pos])
+    ret = int(expr[pos]) # type: float
     pos = pos + 1
     decimal_part = True
     div = 10
@@ -208,10 +208,28 @@ def parse_identifier(expr: str, pos: int):
     return ret, pos
 
 
-_TokenStream = Iterator[Tuple[Token, Union[float, str], int]]
+class _TokenStream(Iterable[Tuple[Token, Any, int]]):
+    def __init__(self, expr):
+        self._src = expr
+        self._src_pos = 0
+        self._generator = _tokenize(self, expr)
 
-@self_generator
-def tokenize(self, expr: str) -> _TokenStream:
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self._generator)
+
+    next = __next__
+
+    def send(self, value):
+        return self._generator.send(value)
+
+
+def tokenize(expr: str) -> _TokenStream:
+    return _TokenStream(expr)
+
+def _tokenize(self, expr: str) -> Iterator[Tuple[Token, Any, int]]:
     """
         A generator which takes a string and converts it to a
         stream of tokens, yielding the triples (token, its value, next position in the string)
@@ -301,6 +319,7 @@ def tokenize(self, expr: str) -> _TokenStream:
             pos = pos + 1
 
 
+T = TypeVar('T', bound='ExpNode')
 class ExpNode(EventMixin):
     """ Base class for nodes in the AST tree """
 
@@ -352,8 +371,8 @@ class ExpNode(EventMixin):
             If assume_const is nonempty, it is a list of ExpressionNodes which are assumed to be const.
         """
         return True
-    
-    def solve(self, val, x: ExpNode) -> None:
+
+    def solve(self, val, x: 'ExpNode') -> None:
         """
             Tries to assign a value to x so that the subexpression rooted at this node evaluates to val. 
         """
@@ -463,7 +482,7 @@ class ExpNode(EventMixin):
         """
         self._ctx = ctx
 
-    def clone(self) -> 'ExpNode':
+    def clone(self: T) -> T:
         """
             Returns a clone of this node which can bind a diffrent context.
         """
@@ -492,29 +511,29 @@ class ExpNode(EventMixin):
 
     def __repr__(self):
         return "<AST Node>"
-    
-    
-    def equiv(self, other: ExpNode, assume_equal=[]):
+
+
+    def equiv(self, other: 'ExpNode', assume_equal=[]):
         """
             Returns True if the subexpression rooted at the current node is always equal (regardless of the context)
             to the expression other if we assume that the identifiers in assume_equal are equal
         """
         return self == other
-    
-    def contains(self, exp: ExpNode):
+
+    def contains(self, exp: 'ExpNode'):
         """
             Returns true if the exp is a subexpression of the expression rooted at the current node.
         """
         return self.equiv(exp)
-    
-    def __eq__(self, other: ExpNode):
+
+    def __eq__(self, other):
         return False
 
 
 class ConstNode(ExpNode):
     """ Node representing a string or number constant """
 
-    def __init__(self, val: Union[float, str]):
+    def __init__(self, val: Union[float, str]) -> None:
         super().__init__()
         self._dirty = False
         self._cached_val = val
@@ -537,8 +556,8 @@ class ConstNode(ExpNode):
     
     def __repr__(self):
         return repr(self._cached_val)
-    
-    def __eq__(self, other: ExpNode):
+
+    def __eq__(self, other):
         return type(self) == type(other) and self._cached_val == other._cached_val
 
 
@@ -560,7 +579,7 @@ class IdentNode(ExpNode):
         'len': len
     }
 
-    def __init__(self, identifier: str):
+    def __init__(self, identifier: str) -> None:
         super().__init__()
         self._ident = identifier
         if self._ident in self.CONSTANTS:
@@ -735,8 +754,8 @@ class MultiChildNode(ExpNode):
             return ConstNode([sch.eval() for ch in simplified_children])
         else:
             return simplified_children
-    
-    def clone(self) -> List[ExpNode]:
+
+    def clone(self) -> List[ExpNode]: # type: ignore
         """
             Since MultiChildNode is an abstract node which is never instantiated,
             the clone method doesn't return the MultiChildNode but a list of cloned
@@ -1172,7 +1191,7 @@ class AttrAccessNode(ExpNode):
 class ListComprNode(ExpNode):
     """ Node representing comprehension, e.g. [ x+10 for x in lst if x//2 == 0 ] """
 
-    def __init__(self, expr, var, lst, cond):
+    def __init__(self, expr: ExpNode, var: IdentNode, lst: ExpNode, cond: ExpNode) -> None:
         super().__init__()
         self._expr = expr
         self._var = var
@@ -1327,8 +1346,9 @@ class OpNode(ExpNode):
         '[]': lambda x, y: x[y],
         '()': lambda func, args: func(*args[0], **args[1])
     }
+    } # type: Dict[str, Callable]
 
-    def __init__(self, operator:str, l_exp: ExpNode, r_exp: ExpNode):
+    def __init__(self, operator:str, l_exp: ExpNode, r_exp: ExpNode) -> None:
         super().__init__()
         self._opstr = operator
         self._op = OpNode.OPS[operator]
@@ -1572,8 +1592,8 @@ def partial_eval(arg_stack: List[ExpNode], op_stack, pri=-1, src=None, location=
 def parse_args(token_stream: _TokenStream) -> Tuple[List[ExpNode], Dict[str, ExpNode]]:
     """ Parses function arguments from the stream and returns them as a pair (args, kwargs)
         where the first is a list and the second a dict """
-    args = []
-    kwargs = {}
+    args = []       # type: List[ExpNode]
+    kwargs = {}     # type: Dict[str, ExpNode]
     state = 'args'
     while state == 'args':
         arg, endt, _pos = _parse(token_stream, [T_COMMA, T_EQUAL, T_RPAREN])
@@ -1585,11 +1605,11 @@ def parse_args(token_stream: _TokenStream) -> Tuple[List[ExpNode], Dict[str, Exp
         else:
             args.append(arg)
     val, endt, _pos = _parse(token_stream, [T_COMMA, T_RPAREN])
-    kwargs[arg._ident] = val
+    kwargs[arg._ident] = val                                        # type: ignore
     while endt != T_RPAREN:
         arg, endt, _pos = _parse(token_stream, [T_EQUAL])
         val, endt, _pos = _parse(token_stream, [T_COMMA, T_RPAREN])
-        kwargs[arg._ident] = val
+        kwargs[arg._ident] = val                                    # type: ignore
     return args, kwargs
 
 
@@ -1607,11 +1627,11 @@ def parse_lst(token_stream: _TokenStream) -> Union[ListComprNode, ListNode]:
             cond = None
         return ListComprNode(expr, var, lst, cond)
     else:
-        lst = [elem]
+        elst = [elem]
         while endt != T_RBRACKET:
             elem, endt, _pos = _parse(token_stream, [T_RBRACKET, T_COMMA, T_KEYWORD])
-            lst.append(elem)
-        return ListNode(lst)
+            elst.append(elem)
+        return ListNode(elst)
 
 
 def parse_slice(token_stream: _TokenStream) -> Tuple[bool, ExpNode, ExpNode, ExpNode]:
@@ -1691,7 +1711,7 @@ def parse_interpolated_str(tpl_expr, start='{{', end='}}', stop_strs=[]):
     return tpl_expr[:abs_pos], ret
 
 
-_PARSE_CACHE = {}
+_PARSE_CACHE = {} # type: Dict[Tuple[str, bool], Tuple[ExpNode, int]]
 
 
 def parse(expr: str, trailing_garbage_ok: bool=False, use_cache: bool=True) -> Tuple[ExpNode, int]:
@@ -1739,8 +1759,8 @@ def _parse(token_stream: _TokenStream, end_tokens=[], trailing_garbage_ok=False,
         The parser is a simple stack based parser, using a variant
         of the [Shunting Yard Algorithm](https://en.wikipedia.org/wiki/Shunting-yard_algorithm)
     """
-    arg_stack = []
-    op_stack = []
+    arg_stack = [] # type: List[ExpNode]
+    op_stack = []  # type: List[Tuple[Token, Any]]
     prev_token = None
     prev_token_set = False
     save_pos = 0
@@ -1752,7 +1772,7 @@ def _parse(token_stream: _TokenStream, end_tokens=[], trailing_garbage_ok=False,
             else:
                 return arg_stack[0], token, pos
         elif token == T_IDENTIFIER:
-            arg_stack.append(IdentNode(val))
+            arg_stack.append(IdentNode(str(val)))
         elif token in [T_NUMBER, T_STRING]:
             arg_stack.append(ConstNode(val))
         elif token == T_OPERATOR or token == T_DOT or (token == T_KEYWORD and val == 'in'):
@@ -1761,7 +1781,7 @@ def _parse(token_stream: _TokenStream, end_tokens=[], trailing_garbage_ok=False,
             # we need to evaluate all pending operations with higher priority
             if val == '-' and (prev_token == T_OPERATOR or prev_token is None or prev_token == T_LBRACKET_LIST or prev_token == T_LPAREN_EXPR):
                 val = '-unary'
-            pri = OP_PRIORITY[val]
+            pri = OP_PRIORITY[str(val)]
             partial_eval(arg_stack, op_stack, pri, src=token_stream._src, location=token_stream._src_pos)
             op_stack.append((token, val))
         elif token == T_LBRACKET:
