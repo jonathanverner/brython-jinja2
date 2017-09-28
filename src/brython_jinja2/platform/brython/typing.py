@@ -18,6 +18,14 @@ class Optional(DummyParametrizedType):
 class Union(DummyParametrizedType):
     pass
 
+class Iterable(DummyParametrizedType):
+    pass
+
 def NewType(self, name, tp):
     return tp
 
+def cast(tp, x):
+    return x
+
+def TypeVar(self, name, bound=None):
+    return object
