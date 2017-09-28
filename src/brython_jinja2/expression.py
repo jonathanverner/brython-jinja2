@@ -1604,11 +1604,15 @@ def parse_args(token_stream: _TokenStream) -> Tuple[List[ExpNode], Dict[str, Exp
             return args, kwargs
         else:
             args.append(arg)
+    if not isinstance(arg, IdentNode):
+        raise ExpressionSyntaxError("Invalid keyword argument name: '"+str(arg)+"'", src=token_stream._src, location=token_stream._pos) # type: ignore
     val, endt, _pos = _parse(token_stream, [T_COMMA, T_RPAREN])
     kwargs[arg._ident] = val                                        # type: ignore
     while endt != T_RPAREN:
         arg, endt, _pos = _parse(token_stream, [T_EQUAL])
         val, endt, _pos = _parse(token_stream, [T_COMMA, T_RPAREN])
+        if not isinstance(arg, IdentNode):
+            raise ExpressionSyntaxError("Invalid keyword argument name: '"+str(arg)+"'", src=token_stream._src, location=token_stream._pos) # type: ignore
         kwargs[arg._ident] = val                                    # type: ignore
     return args, kwargs
 
@@ -1620,6 +1624,8 @@ def parse_lst(token_stream: _TokenStream) -> Union[ListComprNode, ListNode]:
     if endt == T_KEYWORD:
         expr = elem
         var, endt, _pos = _parse(token_stream, [T_KEYWORD])
+        if not isinstance(var, IdentNode):
+            raise ExpressionSyntaxError("Invalid list comprehension variable: '"+str(var)+"'", src=token_stream._src, location=token_stream._pos) # type: ignore
         lst, endt, _pos = _parse(token_stream, [T_KEYWORD, T_RBRACKET])
         if endt == T_KEYWORD:
             cond, endt, _pos = _parse(token_stream, [T_RBRACKET])
