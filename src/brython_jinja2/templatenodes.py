@@ -41,7 +41,7 @@ class Node(DelayedUpdater):
             
     def render_dom(self) -> List[bs4.Tag]:
         root = bs4.dom_from_html(self._get_html_content())
-        t_el = _TemplatedTag(root, self, self._children)
+        t_el = _TemplatedTag(root, self._children)
         self._rendered = [ch.extract() for ch in t_el.children]
         return self._rendered
     
@@ -115,7 +115,7 @@ def register_node(NodeName: str) -> Callable[[type], type]:
         return cls
     return decorator
 
-class _TemplatedTag(bs4.Element):
+class _TemplatedTag(bs4.PageElement):
     def __init__(self, elt: bs4.Tag, node_map: Dict[int, Node]):
         self._elt = bs4.Tag(elt.name)
         self._dynamic_attrs = []

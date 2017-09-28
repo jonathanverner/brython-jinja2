@@ -1011,10 +1011,10 @@ class ListSliceNode(MultiChildNode):
     def simplify(self, assume_const=[]):
         if self._slice:
             args = super().simplify(assume_const)
-            if isinstance(args, ConstNode()):
+            if isinstance(args, ConstNode):
                 return ConstNode(slice(*args.eval()))
             else:
-                return ListSliceNode(self.is_slice, *args)
+                return ListSliceNode(self._slice, *args)
         else:
             return self._children[0].simplify(assume_const)
         
@@ -1284,7 +1284,7 @@ class ListComprNode(ExpNode):
     def contains(self, exp: ExpNode):
         if self._lst.contains(exp):
             return True
-        if self.var_name.equiv(exp):
+        if self._var.equiv(exp):
             return False
         return self._expr.contains(exp) or self._cond.contains(exp) or self.equiv(exp)
     
@@ -1679,7 +1679,7 @@ def parse_interpolated_str(tpl_expr, start='{{', end='}}', stop_strs=[]):
         ast, _etok, rel_pos = _parse(token_stream, end_tokens=[str(end[0])])
         abs_pos += rel_pos                                                   # Skip the first character of the closing string (end)
         if not tpl_expr[abs_pos:abs_pos+len(end)-1] == end[1:]:
-            raise ExpressionSyntaxError("Invalid interpolated string, expecting '"+str(end[1:])+"'", src=tpl_expr, pos=abs_pos)
+            raise ExpressionSyntaxError("Invalid interpolated string, expecting '"+str(end[1:])+"'", src=tpl_expr, location=abs_pos)
         else:
             abs_pos += len(end)-1                                            # Skip the rest of the closing string (end)
         ret.append(OpNode("()", IdentNode("str"), FuncArgsNode([ast], {})))  # Wrap the expression in a str call and add it to the list

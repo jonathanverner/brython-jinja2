@@ -10,8 +10,8 @@ class Template(events.EventMixin):
     def __init__(self, src, env=environment.default_env, update_interval=0.1):
         self.env = env
         self.src = src
-        self.parser = parser.Parser(self.env, self.src)
-        self.ast = self.parser.parse()
+        self.parser = parser.Parser(self.env)
+        self.ast = self.parser.parse(self.src)
         self.render_factory = rendernodes.RenderFactory(self.env)
         self._rendered_nodes = []
         self._update_scheduled = False

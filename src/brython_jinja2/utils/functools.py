@@ -78,8 +78,8 @@ def factory(cls):
         
     def create(self, name, *args, **kwargs):
         constr = self.ACTIVE[name]
-        return constr(name)
-        
+        return constr(*args, **kwargs)
+
     cls.AVAILABLE = {}
     cls.register = register
     cls.create = create

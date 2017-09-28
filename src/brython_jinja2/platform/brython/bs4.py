@@ -22,7 +22,8 @@ def from_native_element(elt):
         return None
  
 
-class Element:
+
+class PageElement:
     def __init__(self, elt):
         self._elt = elt
     
@@ -89,7 +90,7 @@ class Element:
             sib = sib.previous_element
 
 
-class NavigableString(Element):
+class NavigableString(PageElement):
     def __init__(self, string):
         super().__init__(document.createTextNode(string))
       
@@ -112,7 +113,7 @@ class Attrs:
     def __getitem__(self, key):
         return self.elt[key]
 
-class Tag(Element):
+class Tag(PageElement):
     def __init__(self, element_or_html):
         if isinstance(element_or_html, str):
             element_or_html = html.DIV(element_or_html).firstChild
@@ -124,7 +125,7 @@ class Tag(Element):
 
     def get(self, key):
         return self._elt.getAttribute(key)
-    
+
     @property
     def attrs(self):
         return Attrs(self)
@@ -147,7 +148,7 @@ class Tag(Element):
             for d in ch.descendants:
                 yield d
 
-    def extract(self) -> Element:
+    def extract(self) -> PageElement:
         if self.parent:
             self.parent._elt.removeChild(self._elt)
         return self
