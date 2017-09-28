@@ -33,12 +33,16 @@ class Environment:
         self.token_map = sorted((
             (lexer.T_BLOCK_START,block_start_string),
             (lexer.T_BLOCK_END, block_end_string),
-            #(lexer.T_VARIABLE_START, variable_start_string),
-            #(lexer.T_VARIABLE_END, variable_end_string),
+            (lexer.T_VARIABLE_START, variable_start_string),
+            (lexer.T_VARIABLE_END, variable_end_string),
             (lexer.T_COMMENT_START, comment_start_string),
             (lexer.T_COMMENT_END, comment_end_string),
             (lexer.T_NEWLINE, newline_sequence)
         ), key=lambda x:len(x[1]))
+        self.block_start_string = block_start_string
+        self.block_end_string = block_end_string
+        self.comment_start_string = comment_start_string
+        self.comment_end_string = comment_end_string
         self.variable_start_string = variable_start_string
         self.variable_end_string = variable_end_string
         self.extensions = extensions

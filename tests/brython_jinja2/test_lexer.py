@@ -1,5 +1,6 @@
-from brython_jinja2.nodes import HTMLElement
+import brython_jinja2.lexer as l
 from brython_jinja2.lexer import TokenStream
+from brython_jinja2.environment import default_env
 
 def test_slices():
     SRC='<abc >'
@@ -25,3 +26,12 @@ def test_skip():
     assert ts[0] == '1'
     ts.skip(2)
     assert ts[0] == '3'
+    
+def test_comment():
+    SRC='{##}'
+    ts = default_env._tokenize(SRC,'test_comment')
+    toks = list(ts)
+    assert toks[0][:2] == (l.T_COMMENT_START, '{#')
+    assert toks[1][:2] == (l.T_COMMENT_END, '#}')
+    assert toks[2][0] == l.T_EOS
+    

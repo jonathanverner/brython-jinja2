@@ -24,14 +24,36 @@ html_tokens = (
     (T_SPACE, ' '),
 )
 
+TOKEN_NAMES = {
+    T_BLOCK_START: 'BLOCK START',
+    T_BLOCK_END: 'BLOCK END',
+    T_VARIABLE_START: 'VARIABLE START',
+    T_VARIABLE_END: 'VARIABLE END',
+    T_COMMENT_START: 'COMMENT START',
+    T_COMMENT_END: 'COMMENT END',
+    T_HTML_ELEMENT_START: 'HTML ELEMENT START',
+    T_HTML_ELEMENT_END: 'HTML ELEMENT END',
+    T_HTML_COMMENT_START: 'HTML COMMENT START',
+    T_HTML_COMMENT_END: 'HTML COMMENT END',
+    T_NEWLINE: 'NEW LINE',
+    T_SPACE: 'WHITESPACE',
+    T_OTHER: 'OTHER',
+    T_EOS: 'END OF STREAM'
+}
+
+def token_repr(tok):
+    if type(tok) == int:
+        return TOKEN_NAMES.get(tok, 'UNKNOWN TOKEN')
+    else:
+        return str(tok)
 
 def tokens_to_strs(tmap, tokens):
     return [ s for t, s in tmap if t in tokens]
 
 class TokenStream:
     def __init__(self, src, name=None, fname=None, tmap=[]):
-        self.loc = Location(name=name, filename=fname, pos=0, ln=0, col=0)
-        self.token_map = list(tmap) + list(html_tokens)
+        self.loc = Location(src, name=name, filename=fname, pos=0, ln=0, col=0)
+        self.token_map = list(tmap)+[(T_SPACE,' ')]
         self.src = src
         self.left = []
         
@@ -62,8 +84,9 @@ class TokenStream:
                 self.push_left(t, val, loc)
                 return ret
             else:
+                toks.append((t,val,loc))
                 ret += val
-        raise exceptions.EOSException("End of stream while looking for TOKENS "+str(tokens), src=self.src, location=self.loc)
+        raise exceptions.EOSException("End of stream while looking for TOKENS "+str([token_repr(t) for t in tokens]), src=self.src, location=self.loc)
         
     def cat_while(self, tokens):
         ret = ''
