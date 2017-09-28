@@ -8,6 +8,7 @@ from .utils import M
 
 test_runner = local['pytest']
 linter = local['pylint']
+type_checker = local['mypy']
 
 @M.command()
 def devserver(port=8080):
@@ -39,3 +40,13 @@ def lint(report=False):
                 linter("brython_jinja2", stdout=sys.stdout, stderr=sys.stderr)
         except ProcessExecutionError:
             exit(1)
+
+
+@M.command()
+def check():
+    with local.env(PYTHONPATH='./src:./tests/brython/'):
+        with local.cwd('./src'):
+            try:
+                type_checker("-p", "brython_jinja2", stdout=sys.stdout, stderr=sys.stderr) & RETCODE
+            except ProcessExecutionError:
+                exit(1)
