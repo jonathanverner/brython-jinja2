@@ -1,5 +1,5 @@
-from src.circular.utils.events import EventMixin
-from src.circular.template.context import Context
+from src.brython_jinja2.utils.events import EventMixin
+from src.brython_jinja2.context import Context
 
 
 class MockAttr:
@@ -59,7 +59,7 @@ class MockElement(EventMixin):
             MockElement._LAST_ID += 1
             return str(MockElement._LAST_ID-1)
 
-    @id.setter
+    @id.setter # type: ignore
     def set_id(self, value):
         self.attributes[self._indexAttr('id')].value = value
 
@@ -198,6 +198,12 @@ class MockDomElt:
         ch.parent = self
         self.children.insert(pos, ch)
 
+
+def make_tag(name):
+    class NewElt(MockElement):
+        def __init__(self, **kwargs):
+            super().__init__(name, **kwargs)
+    return NewElt
 
 class COMMENT(MockElement):
     def __init__(self, text=None, **kwargs):

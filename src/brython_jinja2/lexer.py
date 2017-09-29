@@ -1,20 +1,23 @@
 from . import exceptions
+from .platform.typing import Any, Iterable, NewType, Tuple
 from .utils import Location
 
-T_BLOCK_START = 0
-T_BLOCK_END = 1
-T_VARIABLE_START = 2
-T_VARIABLE_END = 3
-T_COMMENT_START = 4
-T_COMMENT_END = 5
-T_HTML_ELEMENT_START = 6
-T_HTML_ELEMENT_END = 7
-T_HTML_COMMENT_START = 8
-T_HTML_COMMENT_END = 9
-T_NEWLINE = 10
-T_SPACE = 12
-T_OTHER = 13
-T_EOS = 14
+TokenT = NewType('TokenT', int)
+
+T_BLOCK_START = TokenT(0)
+T_BLOCK_END = TokenT(1)
+T_VARIABLE_START = TokenT(2)
+T_VARIABLE_END = TokenT(3)
+T_COMMENT_START = TokenT(4)
+T_COMMENT_END = TokenT(5)
+T_HTML_ELEMENT_START = TokenT(6)
+T_HTML_ELEMENT_END = TokenT(7)
+T_HTML_COMMENT_START = TokenT(8)
+T_HTML_COMMENT_END = TokenT(9)
+T_NEWLINE = TokenT(10)
+T_SPACE = TokenT(12)
+T_OTHER = TokenT(13)
+T_EOS = TokenT(14)
 
 html_tokens = (
     (T_HTML_COMMENT_START, '<!--'),
@@ -50,7 +53,7 @@ def token_repr(tok):
 def tokens_to_strs(tmap, tokens):
     return [ s for t, s in tmap if t in tokens]
 
-class TokenStream:
+class TokenStream(Iterable[Tuple[TokenT, Any, Location]]):
     def __init__(self, src, name=None, fname=None, tmap=[]):
         self.loc = Location(src, name=name, filename=fname, pos=0, ln=0, col=0)
         self.token_map = list(tmap)+[(T_SPACE,' ')]
@@ -58,7 +61,7 @@ class TokenStream:
         self.left = []
 
     def push_left(self, token, val, pos):
-        self.left.append((token,val, pos))
+        self.left.append((token, val, pos))
 
     def pop_left(self):
         return next(self)

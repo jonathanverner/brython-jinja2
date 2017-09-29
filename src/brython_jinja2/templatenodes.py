@@ -6,7 +6,7 @@ from . import lexer
 from .context import Context
 from .platform import bs4
 from .platform import typing
-from .platform.typing import List, Dict, Optional, Tuple, Iterable, Callable
+from .platform.typing import List, Dict, Optional, Tuple, Iterable, Callable, Mapping, Union
 from .utils.delayedupdater import DelayedUpdater
 
 
@@ -15,13 +15,13 @@ _NODE_END_MARKER='_'
 
 
 class Node(DelayedUpdater):
-    def __init__(self, parser, token_stream: lexer.TokenStream, location: Optional[lexer.Location]=None):
+    def __init__(self, parser, token_stream: lexer.TokenStream, location: Optional[lexer.Location] = None) -> None:
         if location is None:
             self._location = lexer.Location()
         else:
             self._location = location
-        self._children = []
-        self._rendered = []
+        self._children = [] # type: List[Node]
+        self._rendered = [] # type: List[bs4.PageElement]
         self._ctx = Context()
 
     @classmethod
@@ -41,14 +41,14 @@ class Node(DelayedUpdater):
 
     def render_dom(self) -> List[bs4.Tag]:
         root = bs4.dom_from_html(self._get_html_content())
-        t_el = _TemplatedTag(root, self._children)
+        t_el = _TemplatedTag(root, {i:ch for i,ch in enumerate(self._children)})
         self._rendered = [ch.extract() for ch in t_el.children]
         return self._rendered
 
     def render_text(self) -> str:
         ret = ""
         for ch in self._children:
-            ret += ch.render_text(self._ctx)
+            ret += ch.render_text()
         return ret
 
     def bind_ctx(self, ctx: Context):
@@ -94,13 +94,13 @@ class Node(DelayedUpdater):
         return self._children
 
 class NodeFactory:
-    AVAILABLE = {}
+    AVAILABLE = {} # type: Dict[str, type]
 
     @classmethod
     def register(cls, NodeName: str, NodeType: type):
         cls.AVAILABLE[NodeName] = NodeType
 
-    def __init__(self, env: environment.Environment):
+    def __init__(self, env: environment.Environment) -> None:
         self.env = env
         self.active = { k:v for k,v in self.AVAILABLE.items() if k not in env.disabled_tags}
 
@@ -116,9 +116,9 @@ def register_node(NodeName: str) -> Callable[[type], type]:
     return decorator
 
 class _TemplatedTag(bs4.PageElement):
-    def __init__(self, elt: bs4.Tag, node_map: Dict[int, Node]):
+    def __init__(self, elt: bs4.Tag, node_map: Mapping[int, Node]) -> None:
         self._elt = bs4.Tag(elt.name)
-        self._dynamic_attrs = []
+        self._dynamic_attrs = [] # type: List[DynamicAttr]
         for ch in elt.children:
             if isinstance(ch, bs4.NavigableString):
                 pieces = ch.text.split(_NODE_BEGIN_MARKER)
@@ -141,11 +141,15 @@ class _TemplatedTag(bs4.PageElement):
                 id = Node._extract_id(val)
                 self._dynamic_attrs.append(_TemplatedValAttr(self, name, val, node_map))
 
-class _TemplatedValAttr:
-    def __init__(self, elt: bs4.Tag, name: str, value: str, nodes: List[Node]):
+class DynamicAttr:
+    def __init__(self, elt: bs4.Tag) -> None:
         self._elt = elt
+
+class _TemplatedValAttr(DynamicAttr):
+    def __init__(self, elt: bs4.Tag, name: str, value: str, nodes: Mapping[int, Node]) -> None:
+        super().__init__(elt)
         self._name = name
-        self._components = []
+        self._components = [] # type: List[Union[str, Node]]
         pieces = value.split(_NODE_BEGIN_MARKER)
         if pieces[0]:
             self._components.append(pieces[0])
@@ -157,20 +161,21 @@ class _TemplatedValAttr:
                 self._components.append(rest)
 
 
-class _TemplatedAttr:
-    def __init__(self, elt: bs4.Tag, node: Node):
+class _TemplatedAttr(DynamicAttr):
+    def __init__(self, elt: bs4.Tag, node: Node) -> None:
+        super().__init__(elt)
         self._node = node
 
 
 
 class _TemplatedText(bs4.NavigableString):
-    def __init__(self, node: Node):
+    def __init__(self, node: Node) -> None:
         self._tpl_node = node
         self.replace_with(self._tpl_node.render_text())
 
 
 class Comment(Node):
-    def __init__(self, parser, token_stream: lexer.TokenStream, location=None):
+    def __init__(self, parser, token_stream: lexer.TokenStream, location=None) -> None:
         super().__init__(parser, token_stream, location)
         self._content = token_stream.cat_until([lexer.T_COMMENT_END])
 
@@ -178,7 +183,7 @@ class Comment(Node):
         return ""
 
 class Variable(Node):
-    def __init__(self, parser, token_stream: lexer.TokenStream, location=None):
+    def __init__(self, parser, token_stream: lexer.TokenStream, location=None) -> None:
         super().__init__(parser, token_stream, location)
         e_str = parser.env.variable_end_string
         self._content = self.parse_args(token_stream, e_str)
@@ -205,7 +210,7 @@ class Variable(Node):
         return self._content.value
 
 class Content(Node):
-    def __init__(self, parser, token_stream: lexer.TokenStream, location):
+    def __init__(self, parser, token_stream: lexer.TokenStream, location) -> None:
         super().__init__(parser, token_stream, location)
         self._content = token_stream.cat_until([lexer.T_BLOCK_START, lexer.T_VARIABLE_START, lexer.T_COMMENT_START, lexer.T_EOS])
 
@@ -249,9 +254,9 @@ class IfNode(Node):
         {% endif %}
 
     """
-    def __init__(self, parser, token_stream, location=None):
+    def __init__(self, parser, token_stream, location=None) -> None:
         super().__init__(parser, token_stream, location)
-        self._cases = []
+        self._cases = [] # type: List[Tuple[expression.ExpNode, List[Node]]]
         cond = self.parse_args(token_stream, end_str=parser.env.block_end_string)
         body, end_node = parser._parse(token_stream, end_node_names=['else', 'elif', 'endif'])
         self._cases.append((cond, body))
@@ -270,15 +275,15 @@ class IfNode(Node):
 
 @register_node('else')
 class ElseNode(Node):
-    def __init__(self, parser, token_stream, location):
+    def __init__(self, parser, token_stream, location) -> None:
         raise exceptions.TemplateSyntaxError("Unexpected else tag (did you put more than one else tag inside an if?)", src=token_stream.src, location=location)
 
 @register_node('elif')
 class ElifNode(Node):
-    def __init__(self, parser, token_stream, location):
+    def __init__(self, parser, token_stream, location) -> None:
         raise exceptions.TemplateSyntaxError("Unexpected elif tag (did you put the elif after the else?)", src=token_stream.src, location=location)
 
 @register_node('endif')
 class EndifNode(Node):
-    def __init__(self, parser, token_stream, location):
+    def __init__(self, parser, token_stream, location) -> None:
         raise exceptions.TemplateSyntaxError("Unexpected endif tag (not in the scope of an if tag)", src=token_stream.src, location=location)

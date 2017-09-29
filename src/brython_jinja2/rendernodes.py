@@ -1,7 +1,10 @@
+# pylint: skip-file
+# type: ignore
+
 from asyncio import coroutine
 
 from . import exceptions
-from . import nodes
+from . import templatenodes as nodes
 from . import environment
 from . import interpolatedstr
 from . import expression
@@ -10,11 +13,11 @@ from .utils import delayedupdater
 
 class RenderFactory:
     AVAILABLE = {}
-    
+
     @classmethod
     def register(cls, NodeType, RenderType):
         cls.AVAILABLE[NodeType] = RenderType
-        
+
     def __init__(self, env):
         self.env = env
         self.active = { k:v for k,v in self.AVAILABLE.items() }
@@ -23,9 +26,9 @@ class RenderFactory:
         if not type(node) in self.active:
             raise exceptions.RenderError("No renderer available for node "+str(node), location=node._location)
         return self.active[type(node)](tpl_node=node, factory=self)
-    
+
 default_factory = RenderFactory(environment.default_env)
-        
+
 def register_render_node(Node):
     def decorator(cls):
         RenderFactory.register(Node, cls)
@@ -41,14 +44,14 @@ class RenderNode(delayedupdater.DelayedUpdater):
         self._parent = None
         for ch in self._children:
             ch.bind('change', self._child_change_handler)
-        
+
     def clone(self, clone_into=None):
         if clone_into is None:
             clone_into = type(self)()
         clone_into._tpl_node = self._tpl_node
         clone_into._children = [ch.clone() for ch in self._children]
         return clone_into
-        
+
     @coroutine
     def render_into(self, ctx, parent=None):
         self._parent = parent
@@ -61,10 +64,10 @@ class RenderNode(delayedupdater.DelayedUpdater):
             ch.destroy()
 
 
-@register_render_node(nodes.HTMLElement)
+@register_render_node(nodes.Content)
 class HTMLElement(RenderNode):
     UPDATE_ON = 'blur'
-    
+
     def __init__(self, tpl_node=None, factory=default_factory):
         super().__init__(tpl_node, factory)
         self._attrs = {}
@@ -74,11 +77,11 @@ class HTMLElement(RenderNode):
                 self._attrs[attr] = val.clone()
             else:
                 self._attrs[attr] = val
-        
+
         self._value_expr = None
         self._source_expr = None
         self._update_on = self.UPDATE_ON
-                
+
     def clone(self, clone_into=None):
         clone_into = super().clone(clone_into)
         for attr, val in self._attrs.items():
@@ -87,8 +90,8 @@ class HTMLElement(RenderNode):
             else:
                 clone_into._attrs[attr] = val
         return clone_into
-    
-    
+
+
     def _setup_value_binding(self, val):
         self._value_expr = val.get_ast(0, strip_str=True)
         src = self._attrs.get('data-value-source', None)
@@ -99,8 +102,8 @@ class HTMLElement(RenderNode):
         self._source_expr, _ = expression.parse(src)
         self._update_on = self._attrs.get('data-update-source-on', self.UPDATE_ON)
         self._elt._elt.bind(self._update_on, self._update_source)
-        
-            
+
+
     @coroutine
     def render_into(self, ctx, parent):
         tn = self._tpl_node
@@ -125,7 +128,7 @@ class HTMLElement(RenderNode):
         for ch in self._children:
             yield ch.render_into(ctx, self._elt)
         parent.append(self._elt)
-        
+
     def destroy(self):
         super().destroy()
         for val in self._attrs.values():
@@ -134,7 +137,7 @@ class HTMLElement(RenderNode):
         for da in self._dynamic_attrs:
             da.unbind('change')
         self._elt.decompose()
-    
+
     def _update_source(self, evt):
         if self._elt['value'] == self._value_expr.value:
             print("VALUE UNCHANGED", self._value_expr.value)
@@ -151,7 +154,7 @@ class HTMLElement(RenderNode):
                 print("Exception setting value:", str(ex))
                 print("Final value", self._value_expr.value)
                 self._elt['value'] = self._value_expr.value
-            
+
     def _update(self):
         for attr, val in self._attrs.items():
             if isinstance(val, interpolatedstr.InterpolatedStr):
@@ -161,29 +164,29 @@ class HTMLElement(RenderNode):
                 for attr, val in da.value.items():
                     self._elt[attr]=val
             except:
-                pass 
-        
-@register_render_node(nodes.Text)
+                pass
+
+@register_render_node(nodes.Content)
 class Text(RenderNode):
     def __init__(self, tpl_node=None, factory=default_factory):
         super().__init__(tpl_node, factory)
         self._interpolated = tpl_node._interpolated.clone()
-    
+
     def clone(self, clone_into=None):
         clone_into = super().clone(clone_into)
         clone_into._interpolated = self._interpolated.clone()
         return clone_into
-        
+
     @coroutine
     def render_into(self, ctx, parent):
         self._interpolated.bind_ctx(ctx)
         self._elt = bs4.NavigableString(self._interpolated.value)
         parent.append(self._elt)
         self._interpolated.bind('change', self._change_handler)
-        
+
     def _update(self):
         self._elt.replace_with(self._interpolated.value)
-        
+
     def destroy(self):
         super().destroy()
         self._interpolated.unbind('change')

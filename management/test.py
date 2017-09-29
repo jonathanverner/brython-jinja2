@@ -44,9 +44,9 @@ def lint(report=False):
 
 @M.command()
 def check():
-    with local.env(PYTHONPATH='./src:./tests/brython/'):
+    with local.env(MYPYPATH='../tests/brython/:../'):
         with local.cwd('./src'):
             try:
-                type_checker("-p", "brython_jinja2", stdout=sys.stdout, stderr=sys.stderr) & RETCODE
+                type_checker("--ignore-missing-imports", "-p", "brython_jinja2", stdout=sys.stdout, stderr=sys.stderr) & RETCODE
             except ProcessExecutionError:
                 exit(1)

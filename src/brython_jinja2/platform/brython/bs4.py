@@ -1,6 +1,6 @@
 from browser import document, window, html
 
-html.ROOT = html.maketag('ROOT')
+html.ROOT = html.maketag('ROOT') # type: ignore
 
 def dom_from_html(html):
     """

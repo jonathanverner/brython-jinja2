@@ -3,7 +3,7 @@
 
     Notable differences:
 
-      - chaining bool operators, e.g. `1 <= 2 < 3` is not supported
+      - chaining bool operators, e.g. ``1 <= 2 < 3`` is not supported
 
       - Tuples are not supported
 
@@ -26,29 +26,29 @@ from .utils import parser_utils as utils
 ET_EXPRESSION = 0
 ET_INTERPOLATED_STRING = 1
 
-Token = NewType('Token', int)
+TokenT = NewType('TokenT', int)
 
-T_SPACE = Token(0)
-T_NUMBER = Token(1)            # A number immediately preceded by '-' is a negative number, the '-' is not taken as an operator, so 10-11 is not a valid expression
-T_LBRACKET = Token(2)
-T_RBRACKET = Token(3)
-T_LPAREN = Token(4)
-T_RPAREN = Token(5)
-T_LBRACE = Token(6)
-T_RBRACE = Token(7)
-T_DOT = Token(8)
-T_COMMA = Token(9)
-T_COLON = Token(10)
-T_OPERATOR = Token(11)
-T_STRING = Token(12)           # Started by " or '; there is NO distinction between backslash escaping between the two; """,''' and modifiers (e.g. r,b) not implemented"
-T_IDENTIFIER = Token(13)       # Including True, False, None, an identifier starts by alphabetical character and is followed by alphanumeric characters and/or _$
-T_LBRACKET_INDEX = Token(14)   # Bracket starting a list slice
-T_LBRACKET_LIST = Token(15)    # Bracket starting a list
-T_LPAREN_FUNCTION = Token(16)  # Parenthesis starting a function call
-T_LPAREN_EXPR = Token(17)      # Parenthesis starting a subexpression
-T_EQUAL = Token(18)
-T_KEYWORD = Token(19)          # Warning: This does not include True,False,None; these fall in the T_IDENTIFIER category, also this includes 'in' which can, in certain context, be an operator
-T_UNKNOWN = Token(20)
+T_SPACE = TokenT(0)
+T_NUMBER = TokenT(1)            # A number immediately preceded by '-' is a negative number, the '-' is not taken as an operator, so 10-11 is not a valid expression
+T_LBRACKET = TokenT(2)
+T_RBRACKET = TokenT(3)
+T_LPAREN = TokenT(4)
+T_RPAREN = TokenT(5)
+T_LBRACE = TokenT(6)
+T_RBRACE = TokenT(7)
+T_DOT = TokenT(8)
+T_COMMA = TokenT(9)
+T_COLON = TokenT(10)
+T_OPERATOR = TokenT(11)
+T_STRING = TokenT(12)           # Started by " or '; there is NO distinction between backslash escaping between the two; """,''' and modifiers (e.g. r,b) not implemented"
+T_IDENTIFIER = TokenT(13)       # Including True, False, None, an identifier starts by alphabetical character and is followed by alphanumeric characters and/or _$
+T_LBRACKET_INDEX = TokenT(14)   # Bracket starting a list slice
+T_LBRACKET_LIST = TokenT(15)    # Bracket starting a list
+T_LPAREN_FUNCTION = TokenT(16)  # Parenthesis starting a function call
+T_LPAREN_EXPR = TokenT(17)      # Parenthesis starting a subexpression
+T_EQUAL = TokenT(18)
+T_KEYWORD = TokenT(19)          # Warning: This does not include True,False,None; these fall in the T_IDENTIFIER category, also this includes 'in' which can, in certain context, be an operator
+T_UNKNOWN = TokenT(20)
 
 OP_PRIORITY = {
     '(': -2,    # Parenthesis have lowest priority so that we always stop partial evaluation when
@@ -74,7 +74,7 @@ OP_PRIORITY = {
 }
 
 
-def token_type(start_chars: str) -> Token:
+def token_type(start_chars: str) -> TokenT:
     """ Identifies the next token type based on the next four characters """
     # pylint: disable=too-many-boolean-expressions
     # pylint: disable=too-many-return-statements
@@ -208,7 +208,7 @@ def parse_identifier(expr: str, pos: int):
     return ret, pos
 
 
-class _TokenStream(Iterable[Tuple[Token, Any, int]]):
+class _TokenStream(Iterable[Tuple[TokenT, Any, int]]):
     def __init__(self, expr):
         self._src = expr
         self._src_pos = 0
@@ -229,7 +229,7 @@ class _TokenStream(Iterable[Tuple[Token, Any, int]]):
 def tokenize(expr: str) -> _TokenStream:
     return _TokenStream(expr)
 
-def _tokenize(self, expr: str) -> Iterator[Tuple[Token, Any, int]]:
+def _tokenize(self, expr: str) -> Iterator[Tuple[TokenT, Any, int]]:
     """
         A generator which takes a string and converts it to a
         stream of tokens, yielding the triples (token, its value, next position in the string)
@@ -1764,7 +1764,7 @@ def parse(expr: str, trailing_garbage_ok: bool=False, use_cache: bool=True) -> T
     return ast, pos
 
 
-def _parse(token_stream: _TokenStream, end_tokens=[], trailing_garbage_ok=False, end_token_vals=[]) -> Tuple[ExpNode, Optional[Token], int]:
+def _parse(token_stream: _TokenStream, end_tokens=[], trailing_garbage_ok=False, end_token_vals=[]) -> Tuple[ExpNode, Optional[TokenT], int]:
     """
         Parses the `token_stream`, optionally stopping when an
         unconsumed token which is either a token in `end_tokens` or its string value is
@@ -1784,7 +1784,7 @@ def _parse(token_stream: _TokenStream, end_tokens=[], trailing_garbage_ok=False,
         of the [Shunting Yard Algorithm](https://en.wikipedia.org/wiki/Shunting-yard_algorithm)
     """
     arg_stack = [] # type: List[ExpNode]
-    op_stack = []  # type: List[Tuple[Token, Any]]
+    op_stack = []  # type: List[Tuple[TokenT, Any]]
     prev_token = None
     prev_token_set = False
     save_pos = 0
