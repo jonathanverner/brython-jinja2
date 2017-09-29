@@ -402,12 +402,15 @@ class ExpNode(EventMixin):
             Evaluates the node looking up identifiers the context to which it was bound
             by the :func:`bind` method and returns the value.
 
-            Note: If the function is passed `force_cache_refresh=False` the method does nothing if a known good
-            cached value exists. Otherwise the value is recomputed even if a known good value is cached.
+            Note:
+                If the function is passed `force_cache_refresh=False` the method does nothing if a known good
+                cached value exists. Otherwise the value is recomputed even if a known good value is cached.
 
-            Note: The method will update the cached value and the cache status to good.
+            Note:
+                The method will update the cached value and the cache status to good.
 
-            Note: The method can throw; in this case, the value will be undefined
+            Note:
+                The method can throw; in this case, the value will be undefined
         """
         raise NotImplementedError
 
@@ -1430,7 +1433,11 @@ class OpNode(ExpNode):
     def call(self, *inject_args, **inject_kwargs):
         """
             Assuming the node is a function call, call the function
-            appending :param:`inject_args` to its arguments and updating
+            appending
+
+            :param inject_args: to its arguments and updating
+            :type inject_args: tuple
+
             its kwargs with :param:`inject_kwargs`. Retuns the result
             of the call.
         """
@@ -1666,30 +1673,33 @@ def my_find(haystack, needle, stop_strs):
 def parse_interpolated_str(tpl_expr, start='{{', end='}}', stop_strs=[]):
     """ Parses a string of the form
 
-        ```
-          Test text {{ exp }} other text {{ exp2 }} final text.
-        ```
+        .. code-block:: jinja
 
-        where `exp` and `exp2` are expressions and returns a list of asts
+            Test text {{ exp }} other text {{ exp2 }} final text.
+
+
+        where ``exp`` and ``exp2`` are expressions and returns a list of asts
         representing the expressions:
 
-        ```
-          ["Test text ",str(exp)," other text ",str(exp2)," final text."]
-        ```
+        .. code-block:: python
+
+            ["Test text ",str(exp)," other text ",str(exp2)," final text."]
+
 
         Args:
-            start (str): the string opening an expression (defaults to '{{')
-            end (str):   the string closing an expression (defaults to '}}')
-            stop_strs list[str]: Optionally stop parsing when reaching stop_str
-                outside of an expression
+            start (str):           the string opening an expression (defaults to '{{')
+            end (str):             the string closing an expression (defaults to '}}')
+            stop_strs (list(str)): Optionally stop parsing when reaching stop_str
+                                   outside of an expression
 
         Returns:
-            str, list[ExpNode]: The parsed part of the string, a list of asts representing the text (ConstNodes)
-                 and asts of the expressions
+            tuple(str, list(:class:`ExpNode`)): The parsed part of the string,
+            a list of asts representing the text (:class:`ConstNode` s) and asts
+            of the expressions
 
         Raises:
-            ExpressionSyntaxError: In case either one of the expressions is not
-                a valid expression or if one of the expressions is not closed
+            :exc:`exceptions.ExpressionSyntaxError`: In case either one of the expressions is not
+              a valid expression or if one of the expressions is not closed
     """
     last_pos = 0
     matcher = utils.MultiMatcher([start]+stop_strs)
@@ -1722,9 +1732,9 @@ _PARSE_CACHE = {} # type: Dict[Tuple[str, bool], Tuple[ExpNode, int]]
 
 def parse(expr: str, trailing_garbage_ok: bool=False, use_cache: bool=True) -> Tuple[ExpNode, int]:
     """
-        Parses the expression :param:`expr` into an AST tree of
+        Parses the expression ``expr`` into an AST tree of
         :class:`ExpNode` instances. If trailing_garbage_ok is set
-        to `False`, the string must be a valid expression (otherwise
+        to ``False``, the string must be a valid expression (otherwise
         an exception is thrown). If it is set to false, only an initial
         part of the string needs to be a valid expression. The
         function returns a tuple consisting of the root node
@@ -1732,9 +1742,17 @@ def parse(expr: str, trailing_garbage_ok: bool=False, use_cache: bool=True) -> T
         parsing stopped.
 
         Additionnaly, the method maintains a cache of parsed expressions
-        and, unless the parameter :parameter:`use_cache` is set to
-        ``False``, the parsed trees are first looked up in this cache
-        and, if present, a clone is returned.
+        and, unless the ``use_cache`` is set to ``False``, the parsed trees
+        are first looked up in this cache  and, if present, a clone is returned.
+
+        Args:
+            expr (str):                    the expression to parse
+            trailing_garbage_ok (bool):    whether to ignore trailing garbage
+            use_cache (bool):              whether to use the cache
+
+        Returns:
+            tuple(:class:`ExpNode`, int):  The parsed tree and the position where parsing
+            stopped.
     """
     if (expr, trailing_garbage_ok) in _PARSE_CACHE and use_cache:
         ast, pos = _PARSE_CACHE[(expr, trailing_garbage_ok)]

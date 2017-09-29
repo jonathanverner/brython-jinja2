@@ -12,16 +12,18 @@ class Context(object):
         Class used for looking up identifiers when evaluating an expression.
         Access to the variables is via attributes, e.g.:
 
-        ```
+        .. code-block:: python
+
             ctx = Context()
             ctx.a = 20
             ctx.l = [1,2,3]
-        ```
+
 
         The class also supports inheritance (nested scopes) via the base
         attribute passed to init:
 
-        ```
+        .. code-block:: python
+
             ctx = Context()
             ctx.a = 20
 
@@ -31,7 +33,7 @@ class Context(object):
             ch.a = 30
             assert ctx.a == 20, "Child cannot modify base scope"
             assert ch.a == 30, "Child cannot modify base scope"
-        ```
+
 
         WARNING: Only use it to store variables not starting with ``_``.
     """
@@ -63,7 +65,7 @@ class Context(object):
         elif isinstance(dct, Context):
             for k in dct._dct.keys():
                 setattr(self, k, getattr(dct, k))
-    
+
     @property
     def immutable_attrs(self):
         ret = []

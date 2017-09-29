@@ -225,27 +225,29 @@ class IfNode(Node):
     """
     The if tag is comparable with the Python if statement. In the simplest form, you can use it to test if a variable is defined, not empty and not false:
 
-    ```jinja2
-    {% if users %}
-    <ul>
-    {% for user in users %}
-        <li>{{ user.username|e }}</li>
-    {% endfor %}
-    </ul>
-    {% endif %}
-    ```
+    .. code-block:: jinja
+
+        {% if users %}
+        <ul>
+        {% for user in users %}
+            <li>{{ user.username|e }}</li>
+        {% endfor %}
+        </ul>
+        {% endif %}
+
 
     For multiple branches, elif and else can be used like in Python. You can use more complex Expressions there, too:
 
-    ```jinja2
-    {% if kenny.sick %}
-        Kenny is sick.
-    {% elif kenny.dead %}
-        You killed Kenny!  You bastard!!!
-    {% else %}
-        Kenny looks okay --- so far
-    {% endif %}
-    ```
+    .. code-block:: jinja
+
+        {% if kenny.sick %}
+            Kenny is sick.
+        {% elif kenny.dead %}
+            You killed Kenny!  You bastard!!!
+        {% else %}
+            Kenny looks okay --- so far
+        {% endif %}
+
     """
     def __init__(self, parser, token_stream, location=None):
         super().__init__(parser, token_stream, location)

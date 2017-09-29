@@ -6,3 +6,4 @@ venv
 .coverage
 .tox
 .mypy_cache
+doc/en/_build

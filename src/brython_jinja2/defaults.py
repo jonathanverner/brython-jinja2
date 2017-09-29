@@ -1,10 +1,10 @@
 """
     brython_jinja2.defaults
     ~~~~~~~~~~~~~~~
-    
+
     Brython Jinja default filters and tags.
-    
-    :copyright: (c) 2017 by the Jinja Team, (c) Jonathan L. Verner.
+
+    :copyright: (c) 2017 by the Jinja Team, (c) 2017 Jonathan L. Verner.
     :license: BSD, see LICENSE for more details.
 """
 
